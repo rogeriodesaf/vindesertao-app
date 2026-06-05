@@ -1,0 +1,21 @@
+# Java / Quarkus
+backend/target/
+*.class
+
+# Angular / Node
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+# Local tooling
+.idea/
+.vscode/
+*.log
+.env
+.env.*
+!.env.example
+backend/src/main/resources/privateKey.pem
+
+# OS
+.DS_Store
+Thumbs.db
