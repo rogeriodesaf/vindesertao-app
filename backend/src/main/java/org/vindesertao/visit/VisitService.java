@@ -197,7 +197,7 @@ public class VisitService {
 
     private Team resolveVisitTeam(AppUser user) {
         if (currentUser.isAdmin()) {
-            return user.team;
+            throw new IllegalArgumentException("O administrador acompanha as visitas pelo mapa e relatorios, mas nao registra fichas de visita.");
         }
         if (!user.canRegisterVisits) {
             throw new IllegalArgumentException("Este usuario ou equipe nao esta autorizado a registrar visitas.");

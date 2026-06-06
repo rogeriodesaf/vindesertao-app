@@ -6,14 +6,13 @@ import io.restassured.http.ContentType;
 import org.junit.jupiter.api.Test;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 
 @QuarkusTest
 class VisitResourceTest {
     @Test
     @TestSecurity(user = "admin@vindesertao.local", roles = "admin")
-    void createsAndListsVisit() {
+    void adminListsVisitsButDoesNotCreateVisitSheets() {
         String body = """
                 {
                   "personName": "Maria",
@@ -35,15 +34,13 @@ class VisitResourceTest {
                 .when()
                 .post("/visits")
                 .then()
-                .statusCode(200)
-                .body("personName", equalTo("Maria"))
-                .body("wantsVisits", equalTo(true));
+                .statusCode(400);
 
         given()
                 .when()
                 .get("/visits?page=0&size=10")
                 .then()
                 .statusCode(200)
-                .body("total", greaterThanOrEqualTo(1));
+                .body("total", greaterThanOrEqualTo(0));
     }
 }

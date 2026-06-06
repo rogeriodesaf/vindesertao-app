@@ -5,6 +5,7 @@ import { AfterViewInit, Component, OnDestroy, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import * as L from 'leaflet';
 import { ApiService } from '../core/api.service';
+import { AuthService } from '../core/auth.service';
 import { Visit } from '../core/models';
 
 @Component({
@@ -23,67 +24,75 @@ import { Visit } from '../core/models';
       </div>
 
       <aside class="side-panel">
-        <h2>{{ editingId() ? 'Editar visita' : 'Nova visita' }}</h2>
-        <form #visitForm="ngForm" novalidate (ngSubmit)="save(visitForm)">
-          <label>Nome da pessoa<input name="personName" [(ngModel)]="form.personName" required></label>
-          <label>Telefone<input name="phone" [(ngModel)]="form.phone"></label>
-          <div class="form-grid">
-            <label>Rua<input name="street" [(ngModel)]="form.street"></label>
-            <label>Numero<input name="number" [(ngModel)]="form.number"></label>
-          </div>
-          <div class="form-grid">
-            <label>Bairro<input name="neighborhood" [(ngModel)]="form.neighborhood"></label>
-            <label>Cidade<input name="city" [(ngModel)]="form.city" required></label>
-          </div>
-          <label>Endereco manual<textarea name="manualAddress" [(ngModel)]="form.manualAddress"></textarea></label>
-          <div class="form-grid">
-            <label>Idade<input name="personAge" type="number" min="0" [(ngModel)]="form.personAge"></label>
-            <label>Moradores na casa<input name="householdSize" type="number" min="0" [(ngModel)]="form.householdSize"></label>
-          </div>
-          <div class="form-grid">
-            <label>Latitude<input name="latitude" type="number" step="any" [(ngModel)]="form.latitude"></label>
-            <label>Longitude<input name="longitude" type="number" step="any" [(ngModel)]="form.longitude"></label>
-          </div>
-          <label class="check-row">
-            <input name="wantsVisits" type="checkbox" [(ngModel)]="form.wantsVisits">
-            Deseja receber visitas?
-          </label>
-          <label>Ponto de referencia<textarea name="referencePoint" [(ngModel)]="form.referencePoint"></textarea></label>
-          <label>Pedido de oracao<textarea name="prayerRequest" [(ngModel)]="form.prayerRequest"></textarea></label>
-          <label>Proxima visita<input name="nextVisitAt" type="datetime-local" [ngModel]="toLocalDateTime(form.nextVisitAt)" (ngModelChange)="setNextVisitAt($event)"></label>
-          <label>Observacoes<textarea name="notes" [(ngModel)]="form.notes"></textarea></label>
-          <div class="photo-field">
-            <label>Foto da casa
-              <input type="file" accept="image/*" capture="environment" (change)="attachPhoto($event)">
+        @if (canManageVisits()) {
+          <h2>{{ editingId() ? 'Editar visita' : 'Nova visita' }}</h2>
+          <form #visitForm="ngForm" novalidate (ngSubmit)="save(visitForm)">
+            <label>Nome da pessoa<input name="personName" [(ngModel)]="form.personName" required></label>
+            <label>Telefone<input name="phone" [(ngModel)]="form.phone"></label>
+            <div class="form-grid">
+              <label>Rua<input name="street" [(ngModel)]="form.street"></label>
+              <label>Numero<input name="number" [(ngModel)]="form.number"></label>
+            </div>
+            <div class="form-grid">
+              <label>Bairro<input name="neighborhood" [(ngModel)]="form.neighborhood"></label>
+              <label>Cidade<input name="city" [(ngModel)]="form.city" required></label>
+            </div>
+            <label>Endereco manual<textarea name="manualAddress" [(ngModel)]="form.manualAddress"></textarea></label>
+            <div class="form-grid">
+              <label>Idade<input name="personAge" type="number" min="0" [(ngModel)]="form.personAge"></label>
+              <label>Moradores na casa<input name="householdSize" type="number" min="0" [(ngModel)]="form.householdSize"></label>
+            </div>
+            <div class="form-grid">
+              <label>Latitude<input name="latitude" type="number" step="any" [(ngModel)]="form.latitude"></label>
+              <label>Longitude<input name="longitude" type="number" step="any" [(ngModel)]="form.longitude"></label>
+            </div>
+            <label class="check-row">
+              <input name="wantsVisits" type="checkbox" [(ngModel)]="form.wantsVisits">
+              Deseja receber visitas?
             </label>
-            @if (photoPreview()) {
-              <div class="photo-preview">
-                <img [src]="photoPreview()" alt="Foto anexada a ficha">
-                <div>
-                  <strong>{{ form.photoFileName || 'Foto anexada' }}</strong>
-                  <small>Esta foto sera salva junto com a ficha da casa.</small>
-                  <button type="button" class="secondary" (click)="removePhoto()">Remover foto</button>
+            <label>Ponto de referencia<textarea name="referencePoint" [(ngModel)]="form.referencePoint"></textarea></label>
+            <label>Pedido de oracao<textarea name="prayerRequest" [(ngModel)]="form.prayerRequest"></textarea></label>
+            <label>Proxima visita<input name="nextVisitAt" type="datetime-local" [ngModel]="toLocalDateTime(form.nextVisitAt)" (ngModelChange)="setNextVisitAt($event)"></label>
+            <label>Observacoes<textarea name="notes" [(ngModel)]="form.notes"></textarea></label>
+            <div class="photo-field">
+              <label>Foto da casa
+                <input type="file" accept="image/*" capture="environment" (change)="attachPhoto($event)">
+              </label>
+              @if (photoPreview()) {
+                <div class="photo-preview">
+                  <img [src]="photoPreview()" alt="Foto anexada a ficha">
+                  <div>
+                    <strong>{{ form.photoFileName || 'Foto anexada' }}</strong>
+                    <small>Esta foto sera salva junto com a ficha da casa.</small>
+                    <button type="button" class="secondary" (click)="removePhoto()">Remover foto</button>
+                  </div>
                 </div>
-              </div>
+              }
+            </div>
+            @if (message()) {
+              <p class="success">{{ message() }}</p>
             }
-          </div>
-          @if (message()) {
-            <p class="success">{{ message() }}</p>
-          }
-          @if (error()) {
-            <p class="error">{{ error() }}</p>
-          }
-          <div class="actions">
-            <button type="submit">Salvar</button>
-            <button type="button" class="secondary" (click)="resetForm()">Limpar</button>
-            <button type="button" class="secondary" [disabled]="!hasSelectedPoint()" (click)="openStreetView()">
-              Ver no Street View
-            </button>
-          </div>
-        </form>
+            @if (error()) {
+              <p class="error">{{ error() }}</p>
+            }
+            <div class="actions">
+              <button type="submit">Salvar</button>
+              <button type="button" class="secondary" (click)="resetForm()">Limpar</button>
+              <button type="button" class="secondary" [disabled]="!hasSelectedPoint()" (click)="openStreetView()">
+                Ver no Street View
+              </button>
+            </div>
+          </form>
+        } @else {
+          <section class="map-summary-card">
+            <h2>Mapa de visitas realizadas</h2>
+            <p class="muted">Acompanhe aqui as casas marcadas pelas equipes de evangelismo. O mapa atualiza automaticamente enquanto esta tela estiver aberta.</p>
+            <strong>{{ visits().length }} casa(s) carregada(s) no mapa</strong>
+          </section>
+        }
 
         <div class="filters">
-          <h2>Minhas visitas</h2>
+          <h2>{{ canManageVisits() ? 'Minhas visitas' : 'Casas visitadas' }}</h2>
           <div class="form-grid">
             <input placeholder="Bairro" [(ngModel)]="filters.neighborhood" (keyup.enter)="loadVisits()">
             <select [(ngModel)]="filters.wantsVisits" (change)="loadVisits()">
@@ -97,9 +106,12 @@ import { Visit } from '../core/models';
 
         <div class="visit-list">
           @for (visit of visits(); track visit.id) {
-            <button type="button" class="visit-row" (click)="edit(visit)">
+            <button type="button" class="visit-row" (click)="selectVisit(visit)">
               <strong>{{ visit.personName }}</strong>
               <span>{{ visit.neighborhood || visit.manualAddress || visit.city }}</span>
+              @if (!canManageVisits()) {
+                <small>{{ visit.responsibleUserName || 'Responsavel nao informado' }}</small>
+              }
               @if (visit.hasPhoto) {
                 <small>Foto anexada</small>
               }
@@ -122,8 +134,9 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   private map?: L.Map;
   private marker?: L.Marker;
   private visitLayer = L.layerGroup();
+  private refreshHandle?: ReturnType<typeof setInterval>;
 
-  constructor(public api: ApiService, private http: HttpClient) {}
+  constructor(public api: ApiService, private http: HttpClient, private auth: AuthService) {}
 
   ngAfterViewInit(): void {
     this.map = L.map('visit-map', { zoomControl: false }).setView([-7.229, -39.313], 13);
@@ -133,11 +146,21 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       attribution: '&copy; OpenStreetMap'
     }).addTo(this.map);
     this.visitLayer.addTo(this.map);
-    this.map.on('click', (event: L.LeafletMouseEvent) => this.setPoint(event.latlng.lat, event.latlng.lng));
+    this.map.on('click', (event: L.LeafletMouseEvent) => {
+      if (this.canManageVisits()) {
+        this.setPoint(event.latlng.lat, event.latlng.lng);
+      }
+    });
     this.loadVisits();
+    if (!this.canManageVisits()) {
+      this.refreshHandle = setInterval(() => this.loadVisits(), 30000);
+    }
   }
 
   ngOnDestroy(): void {
+    if (this.refreshHandle) {
+      clearInterval(this.refreshHandle);
+    }
     this.map?.remove();
   }
 
@@ -159,12 +182,18 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     }).subscribe((results) => {
       const first = results[0];
       if (!first) {
-        this.form.manualAddress = this.searchText;
-        this.message.set('Endereco nao encontrado. Preencha manualmente e salve.');
+        if (this.canManageVisits()) {
+          this.form.manualAddress = this.searchText;
+        }
+        this.message.set(this.canManageVisits()
+          ? 'Endereco nao encontrado. Preencha manualmente e salve.'
+          : 'Endereco nao encontrado.');
         return;
       }
-      this.form.manualAddress = first.display_name;
-      this.setPoint(Number(first.lat), Number(first.lon));
+      if (this.canManageVisits()) {
+        this.form.manualAddress = first.display_name;
+        this.setPoint(Number(first.lat), Number(first.lon));
+      }
       this.map?.setView([Number(first.lat), Number(first.lon)], 17);
     });
   }
@@ -202,6 +231,16 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         this.map?.setView([fullVisit.latitude, fullVisit.longitude], 17);
       }
     });
+  }
+
+  selectVisit(visit: Visit): void {
+    if (this.canManageVisits()) {
+      this.edit(visit);
+      return;
+    }
+    if (visit.latitude && visit.longitude) {
+      this.map?.setView([visit.latitude, visit.longitude], 18);
+    }
   }
 
   resetForm(): void {
@@ -272,6 +311,11 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     return this.form.photoData || this.form.photoUrl || '';
   }
 
+  canManageVisits(): boolean {
+    const user = this.auth.user();
+    return !!user && !user.roles.includes('admin') && user.canRegisterVisits;
+  }
+
   toLocalDateTime(value?: string): string {
     if (!value) {
       return '';
@@ -295,7 +339,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         radius: 7,
         color: visit.wantsVisits ? '#1f7a4d' : '#a04444',
         fillOpacity: 0.8
-      }).bindPopup(`<strong>${visit.personName}</strong><br>${visit.neighborhood ?? visit.city}`).addTo(this.visitLayer);
+      }).bindPopup(`<strong>${visit.personName}</strong><br>${visit.neighborhood ?? visit.city}<br>${visit.wantsVisits ? 'Aceita visitas' : 'Nao aceita visitas'}`).addTo(this.visitLayer);
     });
   }
 

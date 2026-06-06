@@ -129,6 +129,15 @@ h2 { font-size: 17px; }
 .filters { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
 .full { width: 100%; }
 .visit-list { display: grid; gap: 8px; }
+.map-summary-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8faf8;
+}
+.map-summary-card strong { color: var(--brand-strong); }
 .visit-row {
   width: 100%;
   min-height: auto;
@@ -194,15 +203,18 @@ h2 { font-size: 17px; }
 .goal-card { display: grid; grid-template-columns: minmax(0, 1fr) 180px 260px; }
 .productivity-card { display: grid; align-items: stretch; }
 .team-productivity { display: grid; gap: 8px; }
-.team-report-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.team-report-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
 .team-report-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px;
   display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(360px, 2fr) auto;
+  align-items: center;
   gap: 12px;
 }
 .team-report-card h3 { margin: 0; }
+.team-report-card button { justify-self: end; white-space: nowrap; }
 .goal-progress { display: grid; gap: 6px; }
 .bar-track {
   height: 9px;
@@ -301,6 +313,17 @@ tbody tr:hover { background: #f3f7f4; }
 }
 .info-row div { display: grid; gap: 2px; }
 .info-row span, .info-row small { color: var(--muted); }
+
+@media (max-width: 1180px) {
+  .team-report-card {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .team-report-card button {
+    justify-self: stretch;
+    white-space: normal;
+  }
+}
 
 @media (max-width: 900px) {
   .topbar { align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px; position: sticky; top: 0; z-index: 900; }
