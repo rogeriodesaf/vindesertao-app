@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { HttpErrorResponse } from '@angular/common/http';
 import { SlicePipe } from '@angular/common';
-import { AfterViewInit, Component, OnDestroy, signal } from '@angular/core';
+import { AfterViewInit, Component, NgZone, OnDestroy, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import * as L from 'leaflet';
 import { ApiService } from '../core/api.service';
@@ -137,8 +137,9 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   private visitLayer = L.layerGroup();
   private territoryLayer = L.layerGroup();
   private refreshHandle?: ReturnType<typeof setInterval>;
+  private fittedInitialContent = false;
 
-  constructor(public api: ApiService, private http: HttpClient, private auth: AuthService) {}
+  constructor(public api: ApiService, private http: HttpClient, private auth: AuthService, private zone: NgZone) {}
 
   ngAfterViewInit(): void {
     this.map = L.map('visit-map', { zoomControl: false }).setView([-7.229, -39.313], 13);
@@ -151,7 +152,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.visitLayer.addTo(this.map);
     this.map.on('click', (event: L.LeafletMouseEvent) => {
       if (this.canManageVisits()) {
-        this.setPoint(event.latlng.lat, event.latlng.lng);
+        this.selectPoint(event.latlng.lat, event.latlng.lng);
       }
     });
     this.loadTerritories();
@@ -173,6 +174,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       .subscribe((page) => {
         this.visits.set(page.items);
         this.renderMarkers(page.items);
+        this.fitInitialContent();
       });
   }
 
@@ -180,6 +182,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.api.territories().subscribe((territories) => {
       this.territories.set(territories);
       this.renderTerritories();
+      this.fitInitialContent();
     });
   }
 
@@ -203,7 +206,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       }
       if (this.canManageVisits()) {
         this.form.manualAddress = first.display_name;
-        this.setPoint(Number(first.lat), Number(first.lon));
+        this.selectPoint(Number(first.lat), Number(first.lon));
       }
       this.map?.setView([Number(first.lat), Number(first.lon)], 17);
     });
@@ -238,7 +241,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       this.form = { ...fullVisit };
       this.editingId.set(fullVisit.id ?? null);
       if (fullVisit.latitude && fullVisit.longitude) {
-        this.setPoint(fullVisit.latitude, fullVisit.longitude);
+        this.selectPoint(fullVisit.latitude, fullVisit.longitude);
         this.map?.setView([fullVisit.latitude, fullVisit.longitude], 17);
       }
     });
@@ -370,6 +373,13 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.marker = L.marker([latitude, longitude]).addTo(this.map as L.Map);
   }
 
+  private selectPoint(latitude: number, longitude: number): void {
+    this.zone.run(() => {
+      this.setPoint(latitude, longitude);
+      this.message.set('Ponto selecionado no mapa. Latitude e longitude foram preenchidas.');
+    });
+  }
+
   private renderMarkers(items: Visit[]): void {
     this.visitLayer.clearLayers();
     items.filter((visit) => visit.latitude && visit.longitude).forEach((visit) => {
@@ -389,16 +399,38 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.territories().forEach((territory) => {
       const points = this.pointsFromGeoJson(territory.polygonGeoJson);
       if (points.length >= 3) {
-        L.polygon(points, {
+        const polygon = L.polygon(points, {
           color: territory.color,
           fillColor: territory.color,
           fillOpacity: 0.12,
           weight: 2
-        })
-          .bindPopup(`<strong>${territory.name}</strong><br>${territory.teamName}`)
-          .addTo(this.territoryLayer);
+        }).bindPopup(`<strong>${territory.name}</strong><br>${territory.teamName}`);
+        polygon.on('click', (event: L.LeafletMouseEvent) => {
+          if (this.canManageVisits()) {
+            this.selectPoint(event.latlng.lat, event.latlng.lng);
+          }
+        });
+        polygon.addTo(this.territoryLayer);
       }
     });
+  }
+
+  private fitInitialContent(): void {
+    if (!this.map || this.fittedInitialContent) {
+      return;
+    }
+    const bounds = L.latLngBounds([]);
+    this.territories().forEach((territory) => {
+      this.pointsFromGeoJson(territory.polygonGeoJson).forEach((point) => bounds.extend(point));
+    });
+    this.visits()
+      .filter((visit) => visit.latitude && visit.longitude)
+      .forEach((visit) => bounds.extend([visit.latitude as number, visit.longitude as number]));
+    if (!bounds.isValid()) {
+      return;
+    }
+    this.fittedInitialContent = true;
+    this.map.fitBounds(bounds.pad(0.2), { maxZoom: 16 });
   }
 
   private pointsFromGeoJson(value: string): L.LatLng[] {
