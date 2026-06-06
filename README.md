@@ -206,6 +206,12 @@ Servicos:
 - Senha: `Admin123!`
 - Perfil: `admin`
 
+Lider de equipe para testes:
+
+- E-mail: `lider@vindesertao.local`
+- Senha: `Admin123!`
+- Perfil: `lider`
+
 Em ambiente real, troque a senha no primeiro acesso.
 
 ## Variaveis Principais

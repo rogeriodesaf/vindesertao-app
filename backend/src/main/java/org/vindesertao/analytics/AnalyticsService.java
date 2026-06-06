@@ -28,6 +28,7 @@ public class AnalyticsService {
         AppUser user = currentUser.entity();
         String scope = scopeClause(user);
         List<String> filters = new ArrayList<>();
+        filters.add("lower(coalesce(v.responsibleUser.roles, '')) not like '%admin%'");
         if (!scope.isBlank()) {
             filters.add(scope);
         }
@@ -59,7 +60,7 @@ public class AnalyticsService {
         if (currentUser.isAdmin()) {
             return "";
         }
-        if (currentUser.isLeader() || user.canViewReports) {
+        if (currentUser.isLeader() || user.canViewReports || user.canRegisterVisits) {
             return "v.team.id = :teamId";
         }
         return "v.responsibleUser.id = :userId";
@@ -98,7 +99,7 @@ public class AnalyticsService {
         if (currentUser.isAdmin()) {
             return teams.find("teamType = ?1 and canRegisterVisits = true order by name", TeamType.EVANGELISM).list();
         }
-        if ((currentUser.isLeader() || user.canViewReports) && isEvangelismTeam(user.team)) {
+        if ((currentUser.isLeader() || user.canViewReports || user.canRegisterVisits) && isEvangelismTeam(user.team)) {
             return List.of(user.team);
         }
         return List.of();
@@ -111,6 +112,7 @@ public class AnalyticsService {
     private long countForTeam(Long teamId, Boolean wantsVisits, OffsetDateTime from, OffsetDateTime to) {
         List<String> filters = new ArrayList<>();
         filters.add("v.team.id = :teamId");
+        filters.add("lower(coalesce(v.responsibleUser.roles, '')) not like '%admin%'");
         if (wantsVisits != null) {
             filters.add("v.wantsVisits = :wantsVisits");
         }
@@ -135,10 +137,10 @@ public class AnalyticsService {
     }
 
     private void bind(jakarta.persistence.Query query, OffsetDateTime from, OffsetDateTime to, AppUser user) {
-        if (!currentUser.isAdmin() && (currentUser.isLeader() || user.canViewReports)) {
+        if (!currentUser.isAdmin() && (currentUser.isLeader() || user.canViewReports || user.canRegisterVisits)) {
             query.setParameter("teamId", user.team == null ? -1L : user.team.id);
         }
-        if (!currentUser.isAdmin() && !currentUser.isLeader() && !user.canViewReports) {
+        if (!currentUser.isAdmin() && !currentUser.isLeader() && !user.canViewReports && !user.canRegisterVisits) {
             query.setParameter("userId", user.id);
         }
         if (from != null) {

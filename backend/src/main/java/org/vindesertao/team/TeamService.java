@@ -9,6 +9,7 @@ import org.vindesertao.user.AppUser;
 import org.vindesertao.user.UserRepository;
 
 import java.util.List;
+import java.util.TreeSet;
 
 @ApplicationScoped
 public class TeamService {
@@ -30,6 +31,7 @@ public class TeamService {
         Team team = new Team();
         apply(request, team);
         teams.persist(team);
+        syncLeaderMainTeam(team);
         auditService.log("CREATE", "TEAM", team.id, null, snapshot(team));
         return team;
     }
@@ -40,6 +42,7 @@ public class TeamService {
                 .orElseThrow(() -> new NotFoundException("Equipe nao encontrada."));
         String before = snapshot(team);
         apply(request, team);
+        syncLeaderMainTeam(team);
         auditService.log("UPDATE", "TEAM", team.id, before, snapshot(team));
         return team;
     }
@@ -57,10 +60,29 @@ public class TeamService {
         }
         AppUser leader = users.findByIdOptional(leaderId)
                 .orElseThrow(() -> new IllegalArgumentException("Lider invalido."));
-        if (!leader.hasRole("lider") && !leader.hasRole("admin")) {
-            throw new IllegalArgumentException("O usuario selecionado precisa ter a role lider ou admin.");
+        if (!leader.active) {
+            throw new IllegalArgumentException("O lider selecionado precisa estar ativo.");
+        }
+        if (leader.hasRole("admin")) {
+            throw new IllegalArgumentException("O administrador nao deve ser lider de equipe operacional.");
         }
         return leader;
+    }
+
+    private void syncLeaderMainTeam(Team team) {
+        if (team.leader == null) {
+            return;
+        }
+        team.leader.team = team;
+        addLeaderRole(team.leader);
+        team.leader.canRegisterVisits = team.canRegisterVisits;
+        team.leader.canViewReports = true;
+    }
+
+    private void addLeaderRole(AppUser user) {
+        TreeSet<String> roles = new TreeSet<>(user.roleSet());
+        roles.add("lider");
+        user.roles = String.join(",", roles);
     }
 
     private String snapshot(Team team) {

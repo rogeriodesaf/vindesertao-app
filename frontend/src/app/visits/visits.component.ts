@@ -6,7 +6,7 @@ import { FormsModule, NgForm } from '@angular/forms';
 import * as L from 'leaflet';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
-import { Visit } from '../core/models';
+import { Territory, Visit } from '../core/models';
 
 @Component({
   selector: 'app-visits',
@@ -92,7 +92,7 @@ import { Visit } from '../core/models';
         }
 
         <div class="filters">
-          <h2>{{ canManageVisits() ? 'Minhas visitas' : 'Casas visitadas' }}</h2>
+          <h2>{{ visitListTitle() }}</h2>
           <div class="form-grid">
             <input placeholder="Bairro" [(ngModel)]="filters.neighborhood" (keyup.enter)="loadVisits()">
             <select [(ngModel)]="filters.wantsVisits" (change)="loadVisits()">
@@ -109,7 +109,7 @@ import { Visit } from '../core/models';
             <button type="button" class="visit-row" (click)="selectVisit(visit)">
               <strong>{{ visit.personName }}</strong>
               <span>{{ visit.neighborhood || visit.manualAddress || visit.city }}</span>
-              @if (!canManageVisits()) {
+              @if (showResponsibleName()) {
                 <small>{{ visit.responsibleUserName || 'Responsavel nao informado' }}</small>
               }
               @if (visit.hasPhoto) {
@@ -127,6 +127,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   form: Visit = this.blankVisit();
   filters: { neighborhood: string; wantsVisits: string } = { neighborhood: '', wantsVisits: '' };
   visits = signal<Visit[]>([]);
+  territories = signal<Territory[]>([]);
   editingId = signal<number | null>(null);
   message = signal('');
   error = signal('');
@@ -134,6 +135,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   private map?: L.Map;
   private marker?: L.Marker;
   private visitLayer = L.layerGroup();
+  private territoryLayer = L.layerGroup();
   private refreshHandle?: ReturnType<typeof setInterval>;
 
   constructor(public api: ApiService, private http: HttpClient, private auth: AuthService) {}
@@ -145,12 +147,14 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap'
     }).addTo(this.map);
+    this.territoryLayer.addTo(this.map);
     this.visitLayer.addTo(this.map);
     this.map.on('click', (event: L.LeafletMouseEvent) => {
       if (this.canManageVisits()) {
         this.setPoint(event.latlng.lat, event.latlng.lng);
       }
     });
+    this.loadTerritories();
     this.loadVisits();
     if (!this.canManageVisits()) {
       this.refreshHandle = setInterval(() => this.loadVisits(), 30000);
@@ -170,6 +174,13 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         this.visits.set(page.items);
         this.renderMarkers(page.items);
       });
+  }
+
+  loadTerritories(): void {
+    this.api.territories().subscribe((territories) => {
+      this.territories.set(territories);
+      this.renderTerritories();
+    });
   }
 
   searchAddress(): void {
@@ -234,7 +245,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   }
 
   selectVisit(visit: Visit): void {
-    if (this.canManageVisits()) {
+    if (this.canEditVisit(visit)) {
       this.edit(visit);
       return;
     }
@@ -316,6 +327,33 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     return !!user && !user.roles.includes('admin') && user.canRegisterVisits;
   }
 
+  canEditVisit(visit: Visit): boolean {
+    const user = this.auth.user();
+    if (!user || user.roles.includes('admin')) {
+      return false;
+    }
+    return user.roles.includes('lider');
+  }
+
+  visitListTitle(): string {
+    const user = this.auth.user();
+    if (!user) {
+      return 'Visitas';
+    }
+    if (user.roles.includes('admin')) {
+      return 'Casas visitadas';
+    }
+    if (user.roles.includes('lider')) {
+      return 'Visitas da equipe';
+    }
+    return user.canRegisterVisits ? 'Visitas da equipe' : 'Minhas visitas';
+  }
+
+  showResponsibleName(): boolean {
+    const user = this.auth.user();
+    return !!user && (user.roles.includes('admin') || user.canRegisterVisits);
+  }
+
   toLocalDateTime(value?: string): string {
     if (!value) {
       return '';
@@ -341,6 +379,41 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         fillOpacity: 0.8
       }).bindPopup(`<strong>${visit.personName}</strong><br>${visit.neighborhood ?? visit.city}<br>${visit.wantsVisits ? 'Aceita visitas' : 'Nao aceita visitas'}`).addTo(this.visitLayer);
     });
+  }
+
+  private renderTerritories(): void {
+    if (!this.map) {
+      return;
+    }
+    this.territoryLayer.clearLayers();
+    this.territories().forEach((territory) => {
+      const points = this.pointsFromGeoJson(territory.polygonGeoJson);
+      if (points.length >= 3) {
+        L.polygon(points, {
+          color: territory.color,
+          fillColor: territory.color,
+          fillOpacity: 0.12,
+          weight: 2
+        })
+          .bindPopup(`<strong>${territory.name}</strong><br>${territory.teamName}`)
+          .addTo(this.territoryLayer);
+      }
+    });
+  }
+
+  private pointsFromGeoJson(value: string): L.LatLng[] {
+    try {
+      const parsed = JSON.parse(value);
+      const points = parsed.coordinates[0].map((item: number[]) => L.latLng(item[1], item[0]));
+      const first = points[0];
+      const last = points[points.length - 1];
+      if (first && last && first.lat === last.lat && first.lng === last.lng) {
+        points.pop();
+      }
+      return points;
+    } catch {
+      return [];
+    }
   }
 
   private blankVisit(): Visit {

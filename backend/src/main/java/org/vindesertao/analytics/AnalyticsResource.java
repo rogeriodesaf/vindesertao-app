@@ -12,7 +12,7 @@ import java.time.OffsetDateTime;
 
 @Path("/analytics")
 @Produces(MediaType.APPLICATION_JSON)
-@RolesAllowed({"admin", "lider"})
+@RolesAllowed({"admin", "lider", "projetista"})
 public class AnalyticsResource {
     @Inject
     AnalyticsService analyticsService;

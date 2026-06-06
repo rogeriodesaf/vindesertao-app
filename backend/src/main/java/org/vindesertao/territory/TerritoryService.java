@@ -7,12 +7,17 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
 import org.vindesertao.audit.AuditService;
+import org.vindesertao.auth.CurrentUser;
 import org.vindesertao.team.Team;
 import org.vindesertao.team.TeamRepository;
+import org.vindesertao.user.AppUser;
+import org.vindesertao.user.UserTeamMembershipRepository;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @ApplicationScoped
 public class TerritoryService {
@@ -28,7 +33,24 @@ public class TerritoryService {
     @Inject
     AuditService auditService;
 
-    public List<Territory> list() {
+    @Inject
+    CurrentUser currentUser;
+
+    @Inject
+    UserTeamMembershipRepository memberships;
+
+    public List<Territory> listVisible() {
+        if (currentUser.isAdmin()) {
+            return list();
+        }
+        Set<Long> teamIds = visibleVisitTeamIds(currentUser.entity());
+        if (teamIds.isEmpty()) {
+            return List.of();
+        }
+        return territories.find("active = true and team.id in ?1 order by name", teamIds).list();
+    }
+
+    private List<Territory> list() {
         return territories.find("order by name").list();
     }
 
@@ -99,6 +121,17 @@ public class TerritoryService {
         } catch (RuntimeException | java.io.IOException exception) {
             throw new IllegalArgumentException("Poligono invalido.");
         }
+    }
+
+    private Set<Long> visibleVisitTeamIds(AppUser user) {
+        Set<Long> ids = new LinkedHashSet<>();
+        if (user.team != null && user.team.canRegisterVisits) {
+            ids.add(user.team.id);
+        }
+        memberships.find("user.id = ?1 and team.canRegisterVisits = true order by team.name", user.id)
+                .list()
+                .forEach(membership -> ids.add(membership.team.id));
+        return ids;
     }
 
     private String snapshot(Territory territory) {

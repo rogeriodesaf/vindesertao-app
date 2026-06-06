@@ -93,8 +93,10 @@ const teamTypes: Array<{ value: TeamType; label: string }> = [
 
             <div class="metric-grid compact">
               <div class="metric"><span>Integrantes</span><strong>{{ membersOf(team).length }}</strong></div>
-              <div class="metric"><span>Casas visitadas</span><strong>{{ team.canRegisterVisits ? teamVisits().length : '-' }}</strong></div>
-              <div class="metric"><span>Aceitam visitas</span><strong>{{ team.canRegisterVisits ? acceptedVisits() : '-' }}</strong></div>
+              @if (isEvangelismTeam(team)) {
+                <div class="metric"><span>Casas visitadas</span><strong>{{ teamVisits().length }}</strong></div>
+                <div class="metric"><span>Aceitam visitas</span><strong>{{ acceptedVisits() }}</strong></div>
+              }
             </div>
 
             <section class="detail-section">
@@ -114,22 +116,29 @@ const teamTypes: Array<{ value: TeamType; label: string }> = [
               }
             </section>
 
-            <section class="detail-section">
-              <h2>Ultimas visitas</h2>
-              @if (teamVisits().length) {
-                @for (visit of teamVisits() | slice:0:8; track visit.id) {
-                  <div class="info-row">
-                    <div>
-                      <strong>{{ visit.personName }}</strong>
-                      <span>{{ visit.neighborhood || visit.manualAddress || visit.city }}</span>
+            @if (isEvangelismTeam(team)) {
+              <section class="detail-section">
+                <h2>Ultimas visitas</h2>
+                @if (teamVisits().length) {
+                  @for (visit of teamVisits() | slice:0:8; track visit.id) {
+                    <div class="info-row">
+                      <div>
+                        <strong>{{ visit.personName }}</strong>
+                        <span>{{ visit.neighborhood || visit.manualAddress || visit.city }}</span>
+                      </div>
+                      <small>{{ visit.responsibleUserName || '-' }}</small>
                     </div>
-                    <small>{{ visit.responsibleUserName || '-' }}</small>
-                  </div>
+                  }
+                } @else {
+                  <p class="muted">Nenhuma visita registrada para esta equipe.</p>
                 }
-              } @else {
-                <p class="muted">Nenhuma visita registrada para esta equipe.</p>
-              }
-            </section>
+              </section>
+            } @else {
+              <section class="detail-section">
+                <h2>Indicadores da equipe</h2>
+                <p class="muted">Esta area tera metricas proprias para {{ teamTypeLabel(team.teamType).toLowerCase() }} em uma proxima etapa.</p>
+              </section>
+            }
           } @else {
             <p class="muted">Clique em uma equipe para ver integrantes, lider e visitas relacionadas.</p>
           }
@@ -170,7 +179,7 @@ export class TeamsComponent implements OnInit {
   }
 
   leaders(): AppUser[] {
-    return this.users().filter((user) => user.active && (user.roles.includes('lider') || user.roles.includes('admin')));
+    return this.users().filter((user) => user.active && !user.roles.includes('admin'));
   }
 
   membersOf(team: Team): AppUser[] {
@@ -179,6 +188,10 @@ export class TeamsComponent implements OnInit {
 
   acceptedVisits(): number {
     return this.teamVisits().filter((visit) => visit.wantsVisits).length;
+  }
+
+  isEvangelismTeam(team: Team): boolean {
+    return team.teamType === 'EVANGELISM';
   }
 
   selectTeam(team: Team): void {
@@ -231,7 +244,7 @@ export class TeamsComponent implements OnInit {
   }
 
   private loadTeamVisits(team: Team): void {
-    if (!team.id || !team.canRegisterVisits) {
+    if (!team.id || !this.isEvangelismTeam(team)) {
       this.teamVisits.set([]);
       return;
     }

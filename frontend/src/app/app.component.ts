@@ -19,7 +19,7 @@ import { AuthService } from './core/auth.service';
           </button>
           <nav id="main-menu" [class.open]="menuOpen()">
             <a routerLink="/visits" (click)="closeMenu()">Mapa</a>
-            @if (user.roles.includes('admin') || user.roles.includes('lider') || user.canViewReports) {
+            @if (user.roles.includes('admin') || user.roles.includes('lider') || user.canViewReports || user.canRegisterVisits) {
               <a routerLink="/dashboard" (click)="closeMenu()">Dashboard</a>
             }
             @if (user.roles.includes('admin')) {

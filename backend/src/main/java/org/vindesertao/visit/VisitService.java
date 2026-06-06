@@ -15,8 +15,10 @@ import org.vindesertao.user.UserTeamMembershipRepository;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @ApplicationScoped
 public class VisitService {
@@ -59,6 +61,9 @@ public class VisitService {
     @Transactional
     public HouseholdVisit update(Long id, VisitDtos.VisitRequest request) {
         AppUser user = currentUser.entity();
+        if (!currentUser.isLeader()) {
+            throw new IllegalArgumentException("Somente o lider da equipe pode editar fichas ja cadastradas.");
+        }
         Team visitTeam = resolveVisitTeam(user);
         HouseholdVisit visit = getAllowed(id, true, user);
         String before = snapshot(visit);
@@ -79,6 +84,9 @@ public class VisitService {
         if (currentUser.isLeader() && user.team != null && visit.team != null && user.team.id.equals(visit.team.id)) {
             return visit;
         }
+        if (!edit && visit.team != null && visibleVisitTeamIds(user).contains(visit.team.id)) {
+            return visit;
+        }
         if (visit.responsibleUser != null && visit.responsibleUser.id.equals(user.id)) {
             return visit;
         }
@@ -91,10 +99,14 @@ public class VisitService {
         List<String> where = new ArrayList<>();
         Parameters params = new Parameters();
 
+        where.add("lower(coalesce(responsibleUser.roles, '')) not like :adminRole");
+        params.and("adminRole", "%admin%");
+
         if (!currentUser.isAdmin()) {
-            if (currentUser.isLeader()) {
-                where.add("team.id = :teamId");
-                params.and("teamId", user.team == null ? -1L : user.team.id);
+            Set<Long> visibleTeamIds = visibleVisitTeamIds(user);
+            if (!visibleTeamIds.isEmpty()) {
+                where.add("team.id in :visibleTeamIds");
+                params.and("visibleTeamIds", visibleTeamIds);
             } else {
                 where.add("responsibleUser.id = :currentUserId");
                 params.and("currentUserId", user.id);
@@ -209,6 +221,17 @@ public class VisitService {
                 .firstResultOptional()
                 .map(membership -> membership.team)
                 .orElseThrow(() -> new IllegalArgumentException("Este usuario precisa estar vinculado a uma equipe de evangelismo para registrar visitas."));
+    }
+
+    private Set<Long> visibleVisitTeamIds(AppUser user) {
+        Set<Long> ids = new LinkedHashSet<>();
+        if (user.team != null && user.team.canRegisterVisits) {
+            ids.add(user.team.id);
+        }
+        memberships.find("user.id = ?1 and team.canRegisterVisits = true order by team.name", user.id)
+                .list()
+                .forEach(membership -> ids.add(membership.team.id));
+        return ids;
     }
 
     private String snapshot(HouseholdVisit visit) {
