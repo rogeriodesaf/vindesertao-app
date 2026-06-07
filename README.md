@@ -235,8 +235,41 @@ CLOUDINARY_FOLDER
 Frontend:
 
 ```text
-API_BASE_URL
+BACKEND_URL
 ```
+
+## Deploy no Render
+
+O projeto inclui um `render.yaml` para criar a infraestrutura como Blueprint:
+
+- `vindesertao-db`: PostgreSQL
+- `vindesertao-api`: backend Quarkus em Docker
+- `vindesertao-app`: frontend Angular/Nginx em Docker
+
+Passo a passo:
+
+1. Suba o projeto para o GitHub.
+2. No Render, clique em **New +** > **Blueprint**.
+3. Conecte o repositorio `rogeriodesaf/vindesertao-app`.
+4. Confirme a criacao dos servicos definidos em `render.yaml`.
+5. No servico `vindesertao-api`, adicione um **Secret File**:
+   - caminho: `/etc/secrets/privateKey.pem`
+   - conteudo: o conteudo de `backend/src/main/resources/privateKey.pem` do ambiente local.
+6. No servico `vindesertao-api`, preencha as variaveis do Cloudinary:
+   - `CLOUDINARY_CLOUD_NAME`
+   - `CLOUDINARY_API_KEY`
+   - `CLOUDINARY_API_SECRET`
+7. Confirme que o frontend esta apontando para:
+   - `BACKEND_URL=https://vindesertao-api.onrender.com`
+8. Confirme que o backend permite o frontend:
+   - `APP_CORS_ORIGINS=https://vindesertao-app.onrender.com`
+
+URLs esperadas:
+
+- Frontend: `https://vindesertao-app.onrender.com`
+- Backend: `https://vindesertao-api.onrender.com`
+
+Se o Render gerar nomes diferentes para os servicos, atualize `BACKEND_URL` e `APP_CORS_ORIGINS` no painel do Render.
 
 ## Validacao
 

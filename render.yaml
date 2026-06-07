@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: vindesertao-api
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vindesertao-db
+          property: connectionString
+      - key: APP_CORS_ORIGINS
+        value: https://vindesertao-app.onrender.com
+      - key: JWT_ISSUER
+        value: vinde-sertao
+      - key: JWT_PRIVATE_KEY_LOCATION
+        value: /etc/secrets/privateKey.pem
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_FOLDER
+        value: vinde-sertao/visitas
+
+  - type: web
+    name: vindesertao-app
+    runtime: docker
+    plan: free
+    dockerfilePath: ./frontend/Dockerfile
+    envVars:
+      - key: PORT
+        value: 80
+      - key: BACKEND_URL
+        value: https://vindesertao-api.onrender.com
+
+databases:
+  - name: vindesertao-db
+    plan: free
+    databaseName: vinde_sertao
+    user: vinde
