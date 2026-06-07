@@ -8,5 +8,7 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 ENV JAVA_OPTS="-Dquarkus.http.host=0.0.0.0"
 COPY --from=build /workspace/target/quarkus-app/ ./
+COPY render-start.sh /app/render-start.sh
+RUN chmod +x /app/render-start.sh
 EXPOSE 8080
-CMD ["sh", "-c", "if [ -n \"$DATABASE_URL\" ] && [ -z \"$QUARKUS_DATASOURCE_JDBC_URL\" ]; then export QUARKUS_DATASOURCE_JDBC_URL=$(echo \"$DATABASE_URL\" | sed -E 's#^postgres(ql)?://([^:]+):([^@]+)@([^/]+)/([^?]+).*#jdbc:postgresql://\\4/\\5?user=\\2\\&password=\\3#'); fi; java $JAVA_OPTS -jar quarkus-run.jar"]
+CMD ["/app/render-start.sh"]
