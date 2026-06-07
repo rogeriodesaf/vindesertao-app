@@ -6,6 +6,7 @@ import { FormsModule, NgForm } from '@angular/forms';
 import * as L from 'leaflet';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
+import { formatDateTime } from '../core/date-format';
 import { Territory, Visit } from '../core/models';
 
 @Component({
@@ -116,7 +117,7 @@ import { Territory, Visit } from '../core/models';
               @if (visit.hasPhoto) {
                 <small>Foto anexada</small>
               }
-              <small>{{ visit.createdAt | slice:0:16 }}</small>
+              <small>{{ formatDate(visit.createdAt) }}</small>
             </button>
           }
         </div>
@@ -364,6 +365,10 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   showResponsibleName(): boolean {
     const user = this.auth.user();
     return !!user && (user.roles.includes('admin') || user.canRegisterVisits);
+  }
+
+  formatDate(value?: string): string {
+    return formatDateTime(value);
   }
 
   toLocalDateTime(value?: string): string {

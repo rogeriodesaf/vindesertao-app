@@ -1,6 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { SlicePipe } from '@angular/common';
 import { ApiService } from '../core/api.service';
+import { formatDateTime } from '../core/date-format';
 import { AuditLog } from '../core/models';
 
 @Component({
@@ -80,17 +81,7 @@ export class AuditComponent implements OnInit {
   }
 
   formatDate(value: string): string {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return value?.slice(0, 16) || '-';
-    }
-    return date.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatDateTime(value);
   }
 
   eventTitle(log: AuditLog): string {

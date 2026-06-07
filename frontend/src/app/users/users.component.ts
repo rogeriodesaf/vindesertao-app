@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { SlicePipe } from '@angular/common';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ApiService } from '../core/api.service';
+import { formatDateTime } from '../core/date-format';
 import { AppUser, Role, Team, UserSummary, UserTeamHistory } from '../core/models';
 
 const roles: Role[] = ['admin', 'lider', 'projetista'];
@@ -96,7 +97,7 @@ const roles: Role[] = ['admin', 'lider', 'projetista'];
                     <strong>{{ entry.oldTeamName || 'Sem equipe' }} -> {{ entry.newTeamName || 'Sem equipe' }}</strong>
                     <span>{{ entry.changedByEmail || '-' }}</span>
                   </div>
-                  <small>{{ entry.changedAt | slice:0:16 }}</small>
+                  <small>{{ formatDate(entry.changedAt) }}</small>
                 </div>
               } @empty {
                 <p class="muted">Nenhuma troca de equipe registrada.</p>
@@ -297,6 +298,10 @@ export class UsersComponent implements OnInit {
       access.push('relatórios');
     }
     return access.length ? access.join(', ') : 'apoio';
+  }
+
+  formatDate(value?: string): string {
+    return formatDateTime(value);
   }
 
   syncVisitPermissionWithTeam(): void {

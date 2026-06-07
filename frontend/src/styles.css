@@ -288,7 +288,8 @@ tbody tr { cursor: pointer; }
 tbody tr:hover { background: #f3f7f4; }
 .selected-row { background: #e8f3eb; }
 .teams-layout { display: grid; grid-template-columns: 320px minmax(0, 1fr) 420px; gap: 18px; align-items: start; }
-.teams-layout.member-view { grid-template-columns: minmax(0, 920px); }
+.teams-layout.member-view { grid-template-columns: minmax(0, 1fr); }
+.teams-layout.member-view .detail-card { width: 100%; }
 .territory-layout { display: grid; grid-template-columns: 320px minmax(0, 1fr) 360px; gap: 18px; align-items: start; }
 .territory-map {
   min-height: 620px;

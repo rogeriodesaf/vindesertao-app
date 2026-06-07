@@ -1,5 +1,6 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { ApiService } from '../core/api.service';
+import { formatDateTime } from '../core/date-format';
 import { DuplicateVisitGroup, Visit } from '../core/models';
 
 @Component({
@@ -33,7 +34,7 @@ import { DuplicateVisitGroup, Visit } from '../core/models';
                 <div>
                   <strong>#{{ visit.id }} - {{ visit.personName }}</strong>
                   <span>{{ visit.phone || 'Sem telefone' }} | {{ visit.street || visit.manualAddress || '-' }}, {{ visit.number || '-' }}</span>
-                  <small>{{ visit.responsibleUserName || '-' }} | {{ visit.createdAt || '-' }}</small>
+                  <small>{{ visit.responsibleUserName || '-' }} | {{ formatDate(visit.createdAt) }}</small>
                 </div>
               </label>
             }
@@ -79,6 +80,10 @@ export class DuplicatesComponent implements OnInit {
     if (visit.id) {
       this.targets.set(group.reason, visit.id);
     }
+  }
+
+  formatDate(value?: string): string {
+    return formatDateTime(value);
   }
 
   merge(group: DuplicateVisitGroup): void {
