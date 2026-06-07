@@ -17,7 +17,7 @@ import { Dashboard } from '../core/models';
         <div class="date-filters">
           <label>Data inicial<input type="datetime-local" [(ngModel)]="from"></label>
           <label>Data final<input type="datetime-local" [(ngModel)]="to"></label>
-          <button type="button" (click)="load()">Atualizar</button>
+          <button type="button" (click)="load()">Filtrar</button>
         </div>
       </div>
 
