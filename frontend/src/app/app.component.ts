@@ -44,6 +44,9 @@ import { AuthService } from './core/auth.service';
       <main>
         <router-outlet />
       </main>
+      <footer class="app-footer">
+        © 2026 Desenvolvido por Rogério de Sá - Analista de Sistemas com pós-graduação em Engenharia de Software
+      </footer>
     </ng-container>
   `
 })

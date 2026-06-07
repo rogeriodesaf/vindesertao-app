@@ -85,9 +85,20 @@ h2 { font-size: 17px; }
   background: currentColor;
   display: block;
 }
+.app-footer {
+  min-height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
 
 .login-shell {
-  min-height: 100vh;
+  min-height: calc(100vh - 42px);
   display: grid;
   place-items: center;
   background: linear-gradient(rgba(23, 65, 44, 0.72), rgba(23, 65, 44, 0.72)),
@@ -118,7 +129,7 @@ h2 { font-size: 17px; }
 .success { color: var(--brand); margin: 0; }
 
 .workspace {
-  height: calc(100vh - 58px);
+  height: calc(100vh - 100px);
   display: grid;
   grid-template-columns: minmax(0, 1fr) 430px;
 }
@@ -374,6 +385,7 @@ tbody tr:hover { background: #f3f7f4; }
     background: #f8faf8;
     color: var(--text);
   }
+  .app-footer { font-size: 11px; padding: 10px 12px; }
   .session { order: 3; flex: 1 1 100%; justify-content: space-between; }
   .workspace { height: auto; grid-template-columns: 1fr; }
   .map-panel { height: 62vh; min-height: 440px; }
