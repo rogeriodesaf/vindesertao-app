@@ -1,3 +1,5 @@
 export const environment = {
-  apiBaseUrl: '/api'
+  apiBaseUrl: globalThis.location?.hostname === 'vindesertao-app.onrender.com'
+    ? 'https://vindesertao-api.onrender.com'
+    : '/api'
 };
