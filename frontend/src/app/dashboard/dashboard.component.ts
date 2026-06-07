@@ -15,8 +15,8 @@ import { Dashboard } from '../core/models';
           <p class="muted">Resumo das fichas de visita cadastradas no período selecionado.</p>
         </div>
         <div class="date-filters">
-          <input type="datetime-local" [(ngModel)]="from">
-          <input type="datetime-local" [(ngModel)]="to">
+          <label>Data inicial<input type="datetime-local" [(ngModel)]="from"></label>
+          <label>Data final<input type="datetime-local" [(ngModel)]="to"></label>
           <button type="button" (click)="load()">Atualizar</button>
         </div>
       </div>

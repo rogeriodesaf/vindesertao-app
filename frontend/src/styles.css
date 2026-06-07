@@ -200,6 +200,7 @@ h2 { font-size: 17px; }
 .page { padding: 24px; display: grid; gap: 20px; max-width: 100%; overflow-x: hidden; }
 .page-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .date-filters { display: flex; gap: 10px; align-items: center; }
+.date-filters label { min-width: 190px; }
 .metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .metric, .analytics-grid section, .profile-summary section {
   background: var(--panel);
@@ -375,7 +376,7 @@ tbody tr:hover { background: #f3f7f4; }
   }
   .session { order: 3; flex: 1 1 100%; justify-content: space-between; }
   .workspace { height: auto; grid-template-columns: 1fr; }
-  .map-panel { height: 48vh; min-height: 340px; }
+  .map-panel { height: 62vh; min-height: 440px; }
   .side-panel { border-left: 0; border-top: 1px solid var(--line); padding: 14px; }
   .map-toolbar { grid-template-columns: 1fr 1fr; right: 12px; left: 12px; top: 12px; }
   .map-toolbar input { grid-column: 1 / -1; }
@@ -384,7 +385,7 @@ tbody tr:hover { background: #f3f7f4; }
   .territory-map { min-height: 48vh; }
   .page { padding: 14px; gap: 14px; }
   .page-head, .date-filters, .report-actions { align-items: stretch; flex-direction: column; }
-  .date-filters, .report-actions .actions, .actions { width: 100%; }
+  .date-filters, .date-filters label, .report-actions .actions, .actions { width: 100%; }
   .actions button, .actions .button { flex: 1 1 160px; }
   .form-grid { grid-template-columns: 1fr; }
   .goal-card { grid-template-columns: 1fr; }
@@ -435,7 +436,7 @@ tbody tr:hover { background: #f3f7f4; }
   .icon-button, .menu-toggle { width: auto; }
   .session { width: 100%; }
   .session span { max-width: calc(100vw - 110px); }
-  .map-panel { height: 44vh; min-height: 300px; }
+  .map-panel { height: 64vh; min-height: 430px; }
   .map-toolbar { grid-template-columns: 1fr; }
   .map-toolbar input, .map-toolbar button { grid-column: 1; }
   .photo-preview { grid-template-columns: 1fr; }
