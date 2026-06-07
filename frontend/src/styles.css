@@ -382,7 +382,7 @@ tbody tr:hover { background: #f3f7f4; }
   .map-toolbar input { grid-column: 1 / -1; }
   .map-toolbar button, .map-toolbar .button { width: 100%; }
   .metric-grid, .analytics-grid, .profile-summary, .team-report-grid, .split, .teams-layout, .territory-layout, .duplicate-grid { grid-template-columns: 1fr; }
-  .territory-map { min-height: 48vh; }
+  .territory-map { min-height: max(68vh, 560px); }
   .page { padding: 14px; gap: 14px; }
   .page-head, .date-filters, .report-actions { align-items: stretch; flex-direction: column; }
   .date-filters, .date-filters label, .report-actions .actions, .actions { width: 100%; }
