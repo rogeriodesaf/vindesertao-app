@@ -15,7 +15,7 @@ export const routes: Routes = [
   { path: 'change-password', component: ChangePasswordComponent, canActivate: [authGuard] },
   { path: 'visits', component: VisitsComponent, canActivate: [authGuard] },
   { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard], data: { canViewReports: true } },
-  { path: 'teams', component: TeamsComponent, canActivate: [authGuard], data: { roles: ['admin'] } },
+  { path: 'teams', component: TeamsComponent, canActivate: [authGuard], data: { roles: ['admin', 'lider', 'projetista'] } },
   { path: 'users', component: UsersComponent, canActivate: [authGuard], data: { roles: ['admin'] } },
   { path: 'territories', component: TerritoriesComponent, canActivate: [authGuard], data: { roles: ['admin'] } },
   { path: 'duplicates', component: DuplicatesComponent, canActivate: [authGuard], data: { roles: ['admin'] } },

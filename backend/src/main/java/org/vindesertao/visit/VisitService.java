@@ -159,6 +159,7 @@ public class VisitService {
         visit.prayerRequest = request.prayerRequest();
         visit.nextVisitAt = request.nextVisitAt();
         visit.notes = request.notes();
+        visit.streetViewUrl = trimToNull(request.streetViewUrl());
         applyPhoto(request, visit);
     }
 

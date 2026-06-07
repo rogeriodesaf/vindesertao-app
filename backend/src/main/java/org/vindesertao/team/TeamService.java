@@ -5,10 +5,14 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
 import org.vindesertao.audit.AuditService;
+import org.vindesertao.auth.CurrentUser;
 import org.vindesertao.user.AppUser;
 import org.vindesertao.user.UserRepository;
+import org.vindesertao.user.UserTeamMembershipRepository;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeSet;
 
 @ApplicationScoped
@@ -20,10 +24,21 @@ public class TeamService {
     UserRepository users;
 
     @Inject
+    UserTeamMembershipRepository memberships;
+
+    @Inject
+    CurrentUser currentUser;
+
+    @Inject
     AuditService auditService;
 
     public List<Team> list() {
         return teams.find("order by name").list();
+    }
+
+    public TeamDtos.TeamDetailResponse mine() {
+        Team team = visibleTeamFor(currentUser.entity());
+        return new TeamDtos.TeamDetailResponse(TeamDtos.TeamResponse.from(team), membersOf(team));
     }
 
     @Transactional
@@ -83,6 +98,34 @@ public class TeamService {
         TreeSet<String> roles = new TreeSet<>(user.roleSet());
         roles.add("lider");
         user.roles = String.join(",", roles);
+    }
+
+    private Team visibleTeamFor(AppUser user) {
+        if (user.team != null && user.team.canRegisterVisits) {
+            return user.team;
+        }
+        return memberships.find("user.id = ?1 and team.canRegisterVisits = true order by team.name", user.id)
+                .firstResultOptional()
+                .map(membership -> membership.team)
+                .or(() -> user.team == null
+                        ? memberships.find("user.id = ?1 order by team.name", user.id)
+                        .firstResultOptional()
+                        .map(membership -> membership.team)
+                        : java.util.Optional.of(user.team))
+                .orElseThrow(() -> new NotFoundException("Nenhuma equipe vinculada ao seu usuario."));
+    }
+
+    private List<TeamDtos.TeamMemberResponse> membersOf(Team team) {
+        Map<Long, AppUser> members = new LinkedHashMap<>();
+        users.find("active = true and team.id = ?1 order by name", team.id)
+                .list()
+                .forEach(user -> members.put(user.id, user));
+        memberships.find("team.id = ?1 and user.active = true order by user.name", team.id)
+                .list()
+                .forEach(membership -> members.putIfAbsent(membership.user.id, membership.user));
+        return members.values().stream()
+                .map(user -> TeamDtos.TeamMemberResponse.from(user, team))
+                .toList();
     }
 
     private String snapshot(Team team) {

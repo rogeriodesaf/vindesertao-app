@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { environment } from '../../environments/environment';
-import { AppUser, AuditLog, Dashboard, DuplicateVisitGroup, LoginResponse, PageResponse, Team, Territory, UserSummary, UserTeamHistory, Visit } from './models';
+import { AppUser, AuditLog, Dashboard, DuplicateVisitGroup, LoginResponse, PageResponse, Team, TeamDetail, Territory, UserSummary, UserTeamHistory, Visit } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -64,6 +64,10 @@ export class ApiService {
 
   teams() {
     return this.http.get<Team[]>(`${environment.apiBaseUrl}/teams`);
+  }
+
+  myTeam() {
+    return this.http.get<TeamDetail>(`${environment.apiBaseUrl}/teams/mine`);
   }
 
   createTeam(team: Team) {

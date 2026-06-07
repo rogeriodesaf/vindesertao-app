@@ -10,7 +10,10 @@ import { AuthService } from './core/auth.service';
     <ng-container>
       @if (auth.user(); as user) {
         <header class="topbar">
-          <a class="brand" routerLink="/visits" (click)="closeMenu()">Vinde Sertao</a>
+          <a class="brand" routerLink="/visits" (click)="closeMenu()" aria-label="Vinde Sertao">
+            <img src="/assets/logo-vinde-sertao.webp" alt="">
+            <span>Vinde Sertao</span>
+          </a>
           <button type="button" class="menu-toggle secondary" [attr.aria-expanded]="menuOpen()" aria-controls="main-menu" (click)="toggleMenu()">
             <span></span>
             <span></span>
@@ -28,6 +31,8 @@ import { AuthService } from './core/auth.service';
               <a routerLink="/territories" (click)="closeMenu()">Territorios</a>
               <a routerLink="/duplicates" (click)="closeMenu()">Duplicidades</a>
               <a routerLink="/audit" (click)="closeMenu()">Auditoria</a>
+            } @else if (user.teamId || user.canRegisterVisits || user.canViewReports) {
+              <a routerLink="/teams" (click)="closeMenu()">Minha equipe</a>
             }
           </nav>
           <div class="session">

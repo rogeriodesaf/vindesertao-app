@@ -53,6 +53,7 @@ import { Territory, Visit } from '../core/models';
             <label>Ponto de referencia<textarea name="referencePoint" [(ngModel)]="form.referencePoint"></textarea></label>
             <label>Pedido de oracao<textarea name="prayerRequest" [(ngModel)]="form.prayerRequest"></textarea></label>
             <label>Proxima visita<input name="nextVisitAt" type="datetime-local" [ngModel]="toLocalDateTime(form.nextVisitAt)" (ngModelChange)="setNextVisitAt($event)"></label>
+            <label>Link do Street View<input name="streetViewUrl" type="url" placeholder="Cole aqui o link do Google Street View" [(ngModel)]="form.streetViewUrl"></label>
             <label>Observacoes<textarea name="notes" [(ngModel)]="form.notes"></textarea></label>
             <div class="photo-field">
               <label>Foto da casa
@@ -78,7 +79,7 @@ import { Territory, Visit } from '../core/models';
             <div class="actions">
               <button type="submit">Salvar</button>
               <button type="button" class="secondary" (click)="resetForm()">Limpar</button>
-              <button type="button" class="secondary" [disabled]="!hasSelectedPoint()" (click)="openStreetView()">
+              <button type="button" class="secondary" [disabled]="!hasStreetViewTarget()" (click)="openStreetView()">
                 Ver no Street View
               </button>
             </div>
@@ -269,7 +270,15 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     return this.form.latitude != null && this.form.longitude != null;
   }
 
+  hasStreetViewTarget(): boolean {
+    return this.hasSelectedPoint() || !!this.form.streetViewUrl?.trim();
+  }
+
   openStreetView(): void {
+    if (this.form.streetViewUrl?.trim()) {
+      window.open(this.form.streetViewUrl.trim(), '_blank', 'noopener,noreferrer');
+      return;
+    }
     if (!this.hasSelectedPoint()) {
       return;
     }

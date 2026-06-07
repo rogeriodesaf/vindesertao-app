@@ -49,6 +49,7 @@ export interface Visit {
   photoUrl?: string;
   photoContentType?: string;
   photoFileName?: string;
+  streetViewUrl?: string;
   responsibleUserId?: number;
   responsibleUserName?: string;
   teamId?: number;
@@ -104,6 +105,19 @@ export interface Team {
   leaderName?: string;
   teamType: TeamType;
   canRegisterVisits: boolean;
+}
+
+export interface TeamMember {
+  id: number;
+  name: string;
+  email: string;
+  roles: Role[];
+  leader: boolean;
+}
+
+export interface TeamDetail {
+  team: Team;
+  members: TeamMember[];
 }
 
 export interface Territory {

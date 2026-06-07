@@ -11,7 +11,9 @@ import { AuthService } from '../core/auth.service';
   template: `
     <section class="login-shell">
       <form class="login-panel" (ngSubmit)="submit()">
-        <h1>Vinde Sertao</h1>
+        <div class="login-logo">
+          <img src="/assets/logo-vinde-sertao.webp" alt="Vinde Sertao">
+        </div>
         <label>
           E-mail
           <input name="email" type="email" [(ngModel)]="email" autocomplete="username" required>

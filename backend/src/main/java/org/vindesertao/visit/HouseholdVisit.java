@@ -78,6 +78,9 @@ public class HouseholdVisit extends PanacheEntityBase {
     @Column(name = "photo_public_id", length = 220)
     public String photoPublicId;
 
+    @Column(name = "street_view_url")
+    public String streetViewUrl;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "responsible_user_id", nullable = false)
     public AppUser responsibleUser;

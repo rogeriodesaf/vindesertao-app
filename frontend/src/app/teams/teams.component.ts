@@ -3,7 +3,8 @@ import { Component, OnInit, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ApiService } from '../core/api.service';
-import { AppUser, Team, TeamType, Visit } from '../core/models';
+import { AuthService } from '../core/auth.service';
+import { AppUser, Team, TeamMember, TeamType, Visit } from '../core/models';
 
 const teamTypes: Array<{ value: TeamType; label: string }> = [
   { value: 'EVANGELISM', label: 'Evangelismo' },
@@ -26,59 +27,68 @@ const teamTypes: Array<{ value: TeamType; label: string }> = [
   template: `
     <section class="page">
       <div class="page-head">
-        <h1>Equipes</h1>
-        <button type="button" (click)="newTeam()">Nova equipe</button>
+        <div>
+          <h1>{{ isAdmin() ? 'Equipes' : 'Minha equipe' }}</h1>
+          @if (!isAdmin()) {
+            <p class="muted">Veja aqui o lider e os integrantes vinculados a sua equipe.</p>
+          }
+        </div>
+        @if (isAdmin()) {
+          <button type="button" (click)="newTeam()">Nova equipe</button>
+        }
       </div>
 
-      <div class="teams-layout">
-        <form #teamForm="ngForm" class="editor" novalidate (ngSubmit)="save(teamForm)">
-          <h2>{{ form.id ? 'Editar equipe' : 'Nova equipe' }}</h2>
-          <label>Nome da equipe<input name="name" [(ngModel)]="form.name" required></label>
-          <label>Tipo da equipe
-            <select name="teamType" [(ngModel)]="form.teamType">
-              @for (type of teamTypes; track type.value) {
-                <option [ngValue]="type.value">{{ type.label }}</option>
-              }
-            </select>
-          </label>
-          <label>Lider
-            <select name="leaderId" [(ngModel)]="form.leaderId">
-              <option [ngValue]="undefined">Sem lider</option>
-              @for (leader of leaders(); track leader.id) {
-                <option [ngValue]="leader.id">{{ leader.name }}</option>
-              }
-            </select>
-          </label>
-          <label class="check-row">
-            <input name="canRegisterVisits" type="checkbox" [(ngModel)]="form.canRegisterVisits">
-            Esta equipe pode registrar visitas/evangelismo
-          </label>
-          @if (message()) {
-            <p class="success">{{ message() }}</p>
-          }
-          @if (error()) {
-            <p class="error">{{ error() }}</p>
-          }
-          <button type="submit">Salvar</button>
-        </form>
+      <div class="teams-layout" [class.member-view]="!isAdmin()">
+        @if (isAdmin()) {
+          <form #teamForm="ngForm" class="editor" novalidate (ngSubmit)="save(teamForm)">
+            <h2>{{ form.id ? 'Editar equipe' : 'Nova equipe' }}</h2>
+            <label>Nome da equipe<input name="name" [(ngModel)]="form.name" required></label>
+            <label>Tipo da equipe
+              <select name="teamType" [(ngModel)]="form.teamType">
+                @for (type of teamTypes; track type.value) {
+                  <option [ngValue]="type.value">{{ type.label }}</option>
+                }
+              </select>
+            </label>
+            <label>Lider
+              <select name="leaderId" [(ngModel)]="form.leaderId">
+                <option [ngValue]="undefined">Sem lider</option>
+                @for (leader of leaders(); track leader.id) {
+                  <option [ngValue]="leader.id">{{ leader.name }}</option>
+                }
+              </select>
+            </label>
+            <label class="check-row">
+              <input name="canRegisterVisits" type="checkbox" [(ngModel)]="form.canRegisterVisits">
+              Esta equipe pode registrar visitas/evangelismo
+            </label>
+            @if (message()) {
+              <p class="success">{{ message() }}</p>
+            }
+            @if (error()) {
+              <p class="error">{{ error() }}</p>
+            }
+            <button type="submit">Salvar</button>
+          </form>
 
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Equipe</th><th>Tipo</th><th>Lider</th><th>Integrantes</th></tr>
-            </thead>
-            <tbody>
-              @for (team of teams(); track team.id) {
-                <tr (click)="selectTeam(team)" [class.selected-row]="selectedTeam()?.id === team.id">
-                  <td data-label="Equipe">{{ team.name }}</td>
-                  <td data-label="Tipo">{{ teamTypeLabel(team.teamType) }}</td>
-                  <td data-label="Lider">{{ team.leaderName || '-' }}</td>
-                  <td data-label="Integrantes">{{ membersOf(team).length }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Equipe</th><th>Tipo</th><th>Lider</th><th>Integrantes</th></tr>
+              </thead>
+              <tbody>
+                @for (team of teams(); track team.id) {
+                  <tr (click)="selectTeam(team)" [class.selected-row]="selectedTeam()?.id === team.id">
+                    <td data-label="Equipe">{{ team.name }}</td>
+                    <td data-label="Tipo">{{ teamTypeLabel(team.teamType) }}</td>
+                    <td data-label="Lider">{{ team.leaderName || '-' }}</td>
+                    <td data-label="Integrantes">{{ membersOf(team).length }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
 
         <aside class="detail-card">
           @if (selectedTeam(); as team) {
@@ -88,7 +98,9 @@ const teamTypes: Array<{ value: TeamType; label: string }> = [
                 <span>Lider: {{ team.leaderName || 'Sem lider definido' }}</span>
                 <span>Tipo: {{ teamTypeLabel(team.teamType) }} | {{ team.canRegisterVisits ? 'Registra visitas' : 'Equipe de apoio' }}</span>
               </div>
-              <button type="button" class="secondary" (click)="edit(team)">Editar</button>
+              @if (isAdmin()) {
+                <button type="button" class="secondary" (click)="edit(team)">Editar</button>
+              }
             </div>
 
             <div class="metric-grid compact">
@@ -108,7 +120,7 @@ const teamTypes: Array<{ value: TeamType; label: string }> = [
                       <strong>{{ member.name }}</strong>
                       <span>{{ member.email }}</span>
                     </div>
-                    <small>{{ member.roles.join(', ') }}</small>
+                    <small>{{ memberIsLeader(member) ? 'Lider da equipe' : roleNames(member.roles) }}</small>
                   </div>
                 }
               } @else {
@@ -140,7 +152,7 @@ const teamTypes: Array<{ value: TeamType; label: string }> = [
               </section>
             }
           } @else {
-            <p class="muted">Clique em uma equipe para ver integrantes, lider e visitas relacionadas.</p>
+            <p class="muted">{{ isAdmin() ? 'Clique em uma equipe para ver integrantes, lider e visitas relacionadas.' : 'Nenhuma equipe vinculada ao seu usuario.' }}</p>
           }
         </aside>
       </div>
@@ -150,6 +162,7 @@ const teamTypes: Array<{ value: TeamType; label: string }> = [
 export class TeamsComponent implements OnInit {
   teams = signal<Team[]>([]);
   users = signal<AppUser[]>([]);
+  myTeamMembers = signal<TeamMember[]>([]);
   selectedTeam = signal<Team | null>(null);
   teamVisits = signal<Visit[]>([]);
   message = signal('');
@@ -157,11 +170,15 @@ export class TeamsComponent implements OnInit {
   form: Team = this.blank();
   teamTypes = teamTypes;
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, public auth: AuthService) {}
 
   ngOnInit(): void {
-    this.load();
-    this.loadUsers();
+    if (this.isAdmin()) {
+      this.load();
+      this.loadUsers();
+      return;
+    }
+    this.loadMyTeam();
   }
 
   load(): void {
@@ -182,8 +199,11 @@ export class TeamsComponent implements OnInit {
     return this.users().filter((user) => user.active && !user.roles.includes('admin'));
   }
 
-  membersOf(team: Team): AppUser[] {
-    return this.users().filter((user) => user.teamId === team.id);
+  membersOf(team: Team): Array<AppUser | TeamMember> {
+    if (!this.isAdmin()) {
+      return this.myTeamMembers();
+    }
+    return this.users().filter((user) => user.teamId === team.id || user.additionalTeamIds?.includes(team.id ?? -1));
   }
 
   acceptedVisits(): number {
@@ -200,6 +220,10 @@ export class TeamsComponent implements OnInit {
     this.message.set('');
     this.error.set('');
     this.loadTeamVisits(team);
+  }
+
+  isAdmin(): boolean {
+    return !!this.auth.user()?.roles.includes('admin');
   }
 
   edit(team: Team): void {
@@ -249,6 +273,31 @@ export class TeamsComponent implements OnInit {
       return;
     }
     this.api.visits({ page: 0, size: 100, teamId: team.id }).subscribe((page) => this.teamVisits.set(page.items));
+  }
+
+  private loadMyTeam(): void {
+    this.api.myTeam().subscribe({
+      next: (detail) => {
+        this.teams.set([detail.team]);
+        this.selectedTeam.set(detail.team);
+        this.myTeamMembers.set(detail.members);
+        this.loadTeamVisits(detail.team);
+      },
+      error: (response: HttpErrorResponse) => this.error.set(this.errorMessage(response))
+    });
+  }
+
+  roleNames(roles: string[]): string {
+    const labels: Record<string, string> = {
+      admin: 'Administrador',
+      lider: 'Lider',
+      projetista: 'Projetista'
+    };
+    return roles.map((role) => labels[role] || role).join(', ');
+  }
+
+  memberIsLeader(member: AppUser | TeamMember): boolean {
+    return 'leader' in member ? member.leader : this.selectedTeam()?.leaderId === member.id;
   }
 
   private errorMessage(response: HttpErrorResponse): string {
