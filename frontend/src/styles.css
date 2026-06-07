@@ -394,8 +394,15 @@ tbody tr:hover { background: #f3f7f4; }
     border-radius: 8px;
     background: var(--panel);
   }
-  .date-filters label { min-width: 0; }
-  .date-filters input[type="datetime-local"] { min-width: 0; max-width: 100%; }
+  .date-filters label { min-width: 0; overflow: hidden; }
+  .date-filters input[type="datetime-local"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
   .actions button, .actions .button { flex: 1 1 160px; }
   .form-grid { grid-template-columns: 1fr; }
   .goal-card { grid-template-columns: 1fr; }
