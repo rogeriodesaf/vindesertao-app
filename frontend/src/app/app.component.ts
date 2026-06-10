@@ -50,6 +50,12 @@ import { NotificationService } from './core/notification.service';
       <main>
         <router-outlet />
       </main>
+      @if (auth.user()) {
+        <a class="support-fab" routerLink="/evangelistic-support" (click)="closeMenu()" aria-label="Abrir apoio evangelístico">
+          <strong>?</strong>
+          <span>Apoio</span>
+        </a>
+      }
       @if (notifications.notification(); as notification) {
         <div class="toast" [class.toast-success]="notification.type === 'success'" [class.toast-error]="notification.type === 'error'" [class.toast-info]="notification.type === 'info'" role="status" aria-live="polite">
           <strong>{{ notification.type === 'error' ? 'Atenção' : notification.type === 'success' ? 'Tudo certo' : 'Aviso' }}</strong>
