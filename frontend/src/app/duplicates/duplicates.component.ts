@@ -2,6 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { ApiService } from '../core/api.service';
 import { formatDateTime } from '../core/date-format';
 import { DuplicateVisitGroup, Visit } from '../core/models';
+import { NotificationService } from '../core/notification.service';
 
 @Component({
   selector: 'app-duplicates',
@@ -53,7 +54,7 @@ export class DuplicatesComponent implements OnInit {
   message = signal('');
   error = signal('');
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private notifications: NotificationService) {}
 
   ngOnInit(): void {
     this.load();
@@ -89,16 +90,26 @@ export class DuplicatesComponent implements OnInit {
   merge(group: DuplicateVisitGroup): void {
     const targetId = this.targetId(group);
     if (!targetId) {
-      this.error.set('Escolha a ficha principal antes de mesclar.');
+      this.fail('Escolha a ficha principal antes de mesclar.');
       return;
     }
     const duplicateIds = group.visits.map((visit) => visit.id).filter((id): id is number => !!id && id !== targetId);
     this.api.mergeVisits(targetId, duplicateIds).subscribe({
       next: () => {
-        this.message.set('Fichas mescladas.');
+        this.ok('Fichas mescladas com sucesso.');
         this.load();
       },
-      error: () => this.error.set('Nao foi possivel mesclar as fichas.')
+      error: () => this.fail('Não foi possível mesclar as fichas.')
     });
+  }
+
+  private ok(message: string): void {
+    this.message.set(message);
+    this.notifications.success(message);
+  }
+
+  private fail(message: string): void {
+    this.error.set(message);
+    this.notifications.error(message);
   }
 }

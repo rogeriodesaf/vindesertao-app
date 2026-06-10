@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../core/auth.service';
+import { NotificationService } from '../core/notification.service';
 
 @Component({
   selector: 'app-login',
@@ -36,7 +37,7 @@ export class LoginComponent {
   loading = signal(false);
   error = signal('');
 
-  constructor(private auth: AuthService, private router: Router) {}
+  constructor(private auth: AuthService, private router: Router, private notifications: NotificationService) {}
 
   submit(): void {
     this.loading.set(true);
@@ -44,9 +45,11 @@ export class LoginComponent {
     this.auth.login(this.email, this.password).subscribe({
       next: () => this.router.navigateByUrl('/visits'),
       error: (response: HttpErrorResponse) => {
-        this.error.set(response.status === 401
+        const message = response.status === 401
           ? 'E-mail ou senha invalidos.'
-          : 'Nao foi possivel conectar ao servidor. Tente novamente em instantes.');
+          : 'Nao foi possivel conectar ao servidor. Tente novamente em instantes.';
+        this.error.set(message);
+        this.notifications.error(message);
         this.loading.set(false);
       }
     });

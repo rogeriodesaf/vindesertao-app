@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule, NgForm } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../core/auth.service';
+import { NotificationService } from '../core/notification.service';
 
 @Component({
   selector: 'app-change-password',
@@ -37,21 +38,24 @@ export class ChangePasswordComponent {
   confirmPassword = '';
   error = signal('');
 
-  constructor(public auth: AuthService, private router: Router) {}
+  constructor(public auth: AuthService, private router: Router, private notifications: NotificationService) {}
 
   submit(form: NgForm): void {
     this.error.set('');
     if (form.invalid) {
-      this.error.set('Informe a senha atual e uma nova senha com pelo menos 8 caracteres.');
+      this.fail('Informe a senha atual e uma nova senha com pelo menos 8 caracteres.');
       return;
     }
     if (this.newPassword !== this.confirmPassword) {
-      this.error.set('A confirmacao precisa ser igual a nova senha.');
+      this.fail('A confirmação precisa ser igual à nova senha.');
       return;
     }
     this.auth.changePassword(this.currentPassword, this.newPassword).subscribe({
-      next: () => this.router.navigateByUrl('/visits'),
-      error: (response: HttpErrorResponse) => this.error.set(this.errorMessage(response))
+      next: () => {
+        this.notifications.success('Senha alterada com sucesso.');
+        this.router.navigateByUrl('/visits');
+      },
+      error: (response: HttpErrorResponse) => this.fail(this.errorMessage(response))
     });
   }
 
@@ -64,5 +68,10 @@ export class ChangePasswordComponent {
       return body.violations.map((violation: { message: string }) => violation.message).join(' ');
     }
     return 'Nao foi possivel trocar a senha. Revise os campos e tente novamente.';
+  }
+
+  private fail(message: string): void {
+    this.error.set(message);
+    this.notifications.error(message);
   }
 }

@@ -4,6 +4,7 @@ import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { formatDateTime } from '../core/date-format';
 import { PageResponse, SocialAssistanceRecord, SocialAssistanceSummary, SocialServiceType, Team } from '../core/models';
+import { NotificationService } from '../core/notification.service';
 
 @Component({
   selector: 'app-social-assistance',
@@ -188,7 +189,7 @@ export class SocialAssistanceComponent implements OnInit {
     { value: 'OTHER', label: 'Outro atendimento' }
   ];
 
-  constructor(private api: ApiService, public auth: AuthService) {}
+  constructor(private api: ApiService, public auth: AuthService, private notifications: NotificationService) {}
 
   ngOnInit(): void {
     if (this.auth.user()?.roles.includes('admin')) {
@@ -215,17 +216,18 @@ export class SocialAssistanceComponent implements OnInit {
     this.message.set('');
     this.error.set('');
     if (form.invalid) {
-      this.error.set('Preencha pelo menos nome, cidade, tipo de atendimento e quantidade.');
+      this.fail('Preencha pelo menos nome, cidade, tipo de atendimento e quantidade.');
       return;
     }
+    const editing = !!this.form.id;
     const action = this.form.id ? this.api.updateSocialAssistance(this.form) : this.api.createSocialAssistance(this.form);
     action.subscribe({
       next: () => {
-        this.message.set('Atendimento social salvo.');
+        this.ok(editing ? 'Atendimento social atualizado com sucesso.' : 'Atendimento social salvo com sucesso.');
         this.reset(form);
         this.load();
       },
-      error: (error) => this.error.set(this.errorMessage(error))
+      error: (error) => this.fail(this.errorMessage(error))
     });
   }
 
@@ -294,5 +296,15 @@ export class SocialAssistanceComponent implements OnInit {
       return body.violations.map((violation) => violation.message).join(' ');
     }
     return body?.detail || 'Não foi possível salvar o atendimento social.';
+  }
+
+  private ok(message: string): void {
+    this.message.set(message);
+    this.notifications.success(message);
+  }
+
+  private fail(message: string): void {
+    this.error.set(message);
+    this.notifications.error(message);
   }
 }

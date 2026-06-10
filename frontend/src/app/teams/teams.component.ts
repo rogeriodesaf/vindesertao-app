@@ -5,6 +5,7 @@ import { FormsModule, NgForm } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { AppUser, Team, TeamMember, TeamType, Visit } from '../core/models';
+import { NotificationService } from '../core/notification.service';
 
 const teamTypes: Array<{ value: TeamType; label: string }> = [
   { value: 'EVANGELISM', label: 'Evangelismo' },
@@ -176,7 +177,7 @@ export class TeamsComponent implements OnInit {
   form: Team = this.blank();
   teamTypes = teamTypes;
 
-  constructor(private api: ApiService, public auth: AuthService) {}
+  constructor(private api: ApiService, public auth: AuthService, private notifications: NotificationService) {}
 
   ngOnInit(): void {
     if (this.isAdmin()) {
@@ -261,18 +262,19 @@ export class TeamsComponent implements OnInit {
     this.message.set('');
     this.error.set('');
     if (form.invalid) {
-      this.error.set('Informe o nome da equipe antes de salvar.');
+      this.fail('Informe o nome da equipe antes de salvar.');
       return;
     }
+    const editing = !!this.form.id;
     const action = this.form.id ? this.api.updateTeam(this.form) : this.api.createTeam(this.form);
     action.subscribe({
       next: () => {
-        this.message.set('Equipe salva.');
+        this.ok(editing ? 'Equipe atualizada com sucesso.' : 'Equipe salva com sucesso.');
         this.form = this.blank();
         this.load();
         this.loadUsers();
       },
-      error: (response: HttpErrorResponse) => this.error.set(this.errorMessage(response))
+      error: (response: HttpErrorResponse) => this.fail(this.errorMessage(response))
     });
   }
 
@@ -300,7 +302,7 @@ export class TeamsComponent implements OnInit {
         this.myTeamMembers.set(detail.members);
         this.loadTeamVisits(detail.team);
       },
-      error: (response: HttpErrorResponse) => this.error.set(this.errorMessage(response))
+      error: (response: HttpErrorResponse) => this.fail(this.errorMessage(response))
     });
   }
 
@@ -336,5 +338,15 @@ export class TeamsComponent implements OnInit {
       return body.violations.map((violation: { message: string }) => violation.message).join(' ');
     }
     return 'Nao foi possivel salvar a equipe. Revise os campos e tente novamente.';
+  }
+
+  private ok(message: string): void {
+    this.message.set(message);
+    this.notifications.success(message);
+  }
+
+  private fail(message: string): void {
+    this.error.set(message);
+    this.notifications.error(message);
   }
 }

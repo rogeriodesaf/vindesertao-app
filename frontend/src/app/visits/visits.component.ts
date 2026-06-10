@@ -8,6 +8,7 @@ import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { formatDateTime } from '../core/date-format';
 import { Territory, Visit } from '../core/models';
+import { NotificationService } from '../core/notification.service';
 
 @Component({
   selector: 'app-visits',
@@ -141,7 +142,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   private refreshHandle?: ReturnType<typeof setInterval>;
   private fittedInitialContent = false;
 
-  constructor(public api: ApiService, private http: HttpClient, private auth: AuthService, private zone: NgZone) {}
+  constructor(public api: ApiService, private http: HttpClient, private auth: AuthService, private zone: NgZone, private notifications: NotificationService) {}
 
   ngAfterViewInit(): void {
     this.map = L.map('visit-map', { zoomControl: false }).setView([-7.229, -39.313], 13);
@@ -204,6 +205,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         this.message.set(this.canManageVisits()
           ? 'Endereco nao encontrado. Preencha manualmente e salve.'
           : 'Endereco nao encontrado.');
+        this.notifications.info(this.message());
         return;
       }
       if (this.canManageVisits()) {
@@ -218,20 +220,21 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.message.set('');
     this.error.set('');
     if (form.invalid) {
-      this.error.set('Preencha os campos obrigatorios antes de salvar.');
+      this.fail('Preencha os campos obrigatórios antes de salvar.');
       return;
     }
     const payload = { ...this.form };
+    const editing = !!this.editingId();
     const action = this.editingId()
       ? this.api.updateVisit(this.editingId() as number, payload)
       : this.api.createVisit(payload);
     action.subscribe({
       next: () => {
-        this.message.set('Visita salva.');
+        this.ok(editing ? 'Ficha de visita atualizada com sucesso.' : 'Ficha de visita salva com sucesso.');
         this.resetForm();
         this.loadVisits();
       },
-      error: (response: HttpErrorResponse) => this.error.set(this.errorMessage(response))
+      error: (response: HttpErrorResponse) => this.fail(this.errorMessage(response))
     });
   }
 
@@ -310,7 +313,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       return;
     }
     if (!file.type.startsWith('image/')) {
-      this.error.set('Selecione uma imagem valida para anexar.');
+      this.fail('Selecione uma imagem válida para anexar.');
       return;
     }
     this.resizePhoto(file).then((dataUrl) => {
@@ -319,8 +322,8 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       this.form.photoContentType = 'image/jpeg';
       this.form.photoFileName = file.name || `foto-casa-${new Date().toISOString().slice(0, 10)}.jpg`;
       this.form.hasPhoto = true;
-      this.message.set('Foto anexada a ficha.');
-    }).catch(() => this.error.set('Nao foi possivel anexar a foto. Tente selecionar outra imagem.'));
+      this.ok('Foto anexada à ficha.');
+    }).catch(() => this.fail('Não foi possível anexar a foto. Tente selecionar outra imagem.'));
   }
 
   removePhoto(): void {
@@ -391,6 +394,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.zone.run(() => {
       this.setPoint(latitude, longitude);
       this.message.set('Ponto selecionado no mapa. Latitude e longitude foram preenchidas.');
+      this.notifications.info('Ponto selecionado no mapa.');
     });
   }
 
@@ -508,5 +512,15 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       return body.violations.map((violation: { message: string }) => violation.message).join(' ');
     }
     return 'Nao foi possivel salvar. Revise os campos e tente novamente.';
+  }
+
+  private ok(message: string): void {
+    this.message.set(message);
+    this.notifications.success(message);
+  }
+
+  private fail(message: string): void {
+    this.error.set(message);
+    this.notifications.error(message);
   }
 }

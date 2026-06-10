@@ -1,6 +1,7 @@
 import { Component, signal } from '@angular/core';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { AuthService } from './core/auth.service';
+import { NotificationService } from './core/notification.service';
 
 @Component({
   selector: 'app-root',
@@ -45,6 +46,13 @@ import { AuthService } from './core/auth.service';
       <main>
         <router-outlet />
       </main>
+      @if (notifications.notification(); as notification) {
+        <div class="toast" [class.toast-success]="notification.type === 'success'" [class.toast-error]="notification.type === 'error'" [class.toast-info]="notification.type === 'info'" role="status" aria-live="polite">
+          <strong>{{ notification.type === 'error' ? 'Atenção' : notification.type === 'success' ? 'Tudo certo' : 'Aviso' }}</strong>
+          <span>{{ notification.message }}</span>
+          <button type="button" class="toast-close" aria-label="Fechar mensagem" (click)="notifications.clear()">×</button>
+        </div>
+      }
       <footer class="app-footer">
         © 2026 Desenvolvido por Rogério de Sá - Analista de Sistemas com pós-graduação em Engenharia de Software
       </footer>
@@ -54,7 +62,7 @@ import { AuthService } from './core/auth.service';
 export class AppComponent {
   menuOpen = signal(false);
 
-  constructor(public auth: AuthService) {}
+  constructor(public auth: AuthService, public notifications: NotificationService) {}
 
   toggleMenu(): void {
     this.menuOpen.update((open) => !open);

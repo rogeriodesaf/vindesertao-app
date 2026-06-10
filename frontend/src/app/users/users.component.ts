@@ -5,6 +5,7 @@ import { FormsModule, NgForm } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { formatDateTime } from '../core/date-format';
 import { AppUser, Role, Team, UserSummary, UserTeamHistory } from '../core/models';
+import { NotificationService } from '../core/notification.service';
 
 const roles: Role[] = ['admin', 'lider', 'projetista'];
 
@@ -171,7 +172,7 @@ export class UsersComponent implements OnInit {
   availableRoles = roles;
   form: AppUser = this.blank();
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private notifications: NotificationService) {}
 
   ngOnInit(): void {
     this.load();
@@ -219,23 +220,23 @@ export class UsersComponent implements OnInit {
     this.message.set('');
     this.error.set('');
     if (form.invalid) {
-      this.error.set('Preencha nome, e-mail e uma senha com pelo menos 8 caracteres.');
+      this.fail('Preencha nome, e-mail e uma senha com pelo menos 8 caracteres.');
       return;
     }
     if (this.form.roles.length === 0) {
-      this.error.set('Selecione pelo menos uma permissao para o usuario.');
+      this.fail('Selecione pelo menos uma permissao para o usuario.');
       return;
     }
     const action = this.form.id ? this.api.updateUser(this.form) : this.api.createUser(this.form);
     action.subscribe({
       next: () => {
-        this.message.set('Usuario salvo.');
+        this.ok(this.form.id ? 'Usuário atualizado com sucesso.' : 'Usuário salvo com sucesso.');
         this.form = this.blank();
         this.pageIndex.set(0);
         this.load();
         this.loadSummary();
       },
-      error: (response: HttpErrorResponse) => this.error.set(this.errorMessage(response))
+      error: (response: HttpErrorResponse) => this.fail(this.errorMessage(response))
     });
   }
 
@@ -327,5 +328,15 @@ export class UsersComponent implements OnInit {
       return body.violations.map((violation: { message: string }) => violation.message).join(' ');
     }
     return 'Nao foi possivel salvar o usuario. Revise os campos e tente novamente.';
+  }
+
+  private ok(message: string): void {
+    this.message.set(message);
+    this.notifications.success(message);
+  }
+
+  private fail(message: string): void {
+    this.error.set(message);
+    this.notifications.error(message);
   }
 }

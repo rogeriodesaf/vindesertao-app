@@ -4,6 +4,7 @@ import { FormsModule, NgForm } from '@angular/forms';
 import * as L from 'leaflet';
 import { ApiService } from '../core/api.service';
 import { Team, Territory } from '../core/models';
+import { NotificationService } from '../core/notification.service';
 
 @Component({
   selector: 'app-territories',
@@ -80,7 +81,7 @@ export class TerritoriesComponent implements OnInit, AfterViewInit, OnDestroy {
   private drawingLayer = L.layerGroup();
   private territoryLayer = L.layerGroup();
 
-  constructor(private api: ApiService, private http: HttpClient) {}
+  constructor(private api: ApiService, private http: HttpClient, private notifications: NotificationService) {}
 
   ngOnInit(): void {
     this.api.teams().subscribe((teams) => {
@@ -118,19 +119,20 @@ export class TerritoriesComponent implements OnInit, AfterViewInit, OnDestroy {
     this.message.set('');
     this.error.set('');
     if (form.invalid || this.drawnPoints.length < 3) {
-      this.error.set('Preencha os dados e marque pelo menos 3 pontos no mapa.');
+      this.fail('Preencha os dados e marque pelo menos 3 pontos no mapa.');
       return;
     }
     this.form.polygonGeoJson = this.geoJson();
+    const editing = !!this.form.id;
     const action = this.form.id ? this.api.updateTerritory(this.form) : this.api.createTerritory(this.form);
     action.subscribe({
       next: () => {
-        this.message.set('Territorio salvo.');
+        this.ok(editing ? 'Território atualizado com sucesso.' : 'Território salvo com sucesso.');
         this.form = this.blank();
         this.clearDrawing();
         this.load();
       },
-      error: () => this.error.set('Nao foi possivel salvar o territorio.')
+      error: () => this.fail('Não foi possível salvar o território.')
     });
   }
 
@@ -157,7 +159,7 @@ export class TerritoriesComponent implements OnInit, AfterViewInit, OnDestroy {
     }).subscribe((results) => {
       const first = results[0];
       if (!first) {
-        this.error.set('Endereco nao encontrado. Tente informar rua, bairro e cidade.');
+        this.fail('Endereço não encontrado. Tente informar rua, bairro e cidade.');
         return;
       }
       this.error.set('');
@@ -223,5 +225,15 @@ export class TerritoriesComponent implements OnInit, AfterViewInit, OnDestroy {
 
   visitTeams(): Team[] {
     return this.teams().filter((team) => team.canRegisterVisits);
+  }
+
+  private ok(message: string): void {
+    this.message.set(message);
+    this.notifications.success(message);
+  }
+
+  private fail(message: string): void {
+    this.error.set(message);
+    this.notifications.error(message);
   }
 }
