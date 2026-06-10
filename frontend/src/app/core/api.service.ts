@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { environment } from '../../environments/environment';
-import { AppUser, AuditLog, Dashboard, DuplicateVisitGroup, FinanceSummary, FinancialTransaction, LoginResponse, PageResponse, SocialAssistanceRecord, SocialAssistanceSummary, Team, TeamDetail, Territory, UserSummary, UserTeamHistory, Visit } from './models';
+import { AppUser, AuditLog, ChildRecord, ChildrenSummary, Dashboard, DuplicateVisitGroup, FinanceSummary, FinancialTransaction, LoginResponse, PageResponse, SocialAssistanceRecord, SocialAssistanceSummary, Team, TeamDetail, Territory, UserSummary, UserTeamHistory, Visit } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -143,6 +143,29 @@ export class ApiService {
 
   exportFinance(params: Record<string, string | number | undefined> = {}) {
     return this.http.get(`${environment.apiBaseUrl}/finance/export.xlsx`, {
+      params: this.params(params),
+      responseType: 'blob'
+    });
+  }
+
+  children(params: Record<string, string | number | undefined>) {
+    return this.http.get<PageResponse<ChildRecord>>(`${environment.apiBaseUrl}/children`, { params: this.params(params) });
+  }
+
+  childrenSummary(params: Record<string, string | number | undefined>) {
+    return this.http.get<ChildrenSummary>(`${environment.apiBaseUrl}/children/summary`, { params: this.params(params) });
+  }
+
+  createChild(record: ChildRecord) {
+    return this.http.post<ChildRecord>(`${environment.apiBaseUrl}/children`, record);
+  }
+
+  updateChild(record: ChildRecord) {
+    return this.http.put<ChildRecord>(`${environment.apiBaseUrl}/children/${record.id}`, record);
+  }
+
+  exportChildren(params: Record<string, string | number | undefined> = {}) {
+    return this.http.get(`${environment.apiBaseUrl}/children/export.xlsx`, {
       params: this.params(params),
       responseType: 'blob'
     });

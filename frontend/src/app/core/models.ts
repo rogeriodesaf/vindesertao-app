@@ -10,6 +10,7 @@ export interface UserPrincipal {
   canRegisterVisits: boolean;
   canViewReports: boolean;
   canAccessFinance: boolean;
+  canAccessChildren: boolean;
 }
 
 export interface LoginResponse {
@@ -96,6 +97,7 @@ export interface AppUser {
   canRegisterVisits: boolean;
   canViewReports: boolean;
   canAccessFinance: boolean;
+  canAccessChildren: boolean;
 }
 
 export type TeamType = 'EVANGELISM' | 'SUPPORT' | 'SOCIAL_ACTION' | 'CHILDREN' | 'KITCHEN' | 'MUSIC' | 'INTERCESSION' | 'MEDIA' | 'SECRETARIAT' | 'FINANCE' | 'OTHER';
@@ -225,4 +227,28 @@ export interface FinanceSummary {
   byCategory: Array<{ label: string; total: number }>;
   byPaymentMethod: Array<{ label: string; total: number }>;
   byPeriod: Array<{ label: string; total: number }>;
+}
+
+export interface ChildRecord {
+  id?: number;
+  childName: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  age?: number;
+  neighborhood?: string;
+  city: string;
+  activityName?: string;
+  notes?: string;
+  responsibleUserId?: number;
+  responsibleUserName?: string;
+  createdAt?: string;
+}
+
+export interface ChildrenSummary {
+  totalChildren: number;
+  totalRecords: number;
+  byActivity: CountItem[];
+  byResponsible: CountItem[];
+  byNeighborhood: CountItem[];
+  byPeriod: CountItem[];
 }

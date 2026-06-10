@@ -56,6 +56,7 @@ public class UserService {
         user.canRegisterVisits = request.canRegisterVisits();
         user.canViewReports = request.canViewReports();
         user.canAccessFinance = request.canAccessFinance();
+        user.canAccessChildren = request.canAccessChildren();
         user.mustChangePassword = true;
         user.createdAt = OffsetDateTime.now();
         users.persist(user);
@@ -78,6 +79,7 @@ public class UserService {
         user.canRegisterVisits = request.canRegisterVisits();
         user.canViewReports = request.canViewReports();
         user.canAccessFinance = request.canAccessFinance();
+        user.canAccessChildren = request.canAccessChildren();
         user.updatedAt = OffsetDateTime.now();
         if (request.password() != null && !request.password().isBlank()) {
             if (request.password().length() < 8) {
@@ -124,7 +126,10 @@ public class UserService {
             if (user.canAccessFinance) {
                 byAccess.merge("Podem acessar financeiro", 1L, Long::sum);
             }
-            if (!user.canRegisterVisits && !user.canViewReports && !user.canAccessFinance) {
+            if (user.canAccessChildren) {
+                byAccess.merge("Podem acessar infantil", 1L, Long::sum);
+            }
+            if (!user.canRegisterVisits && !user.canViewReports && !user.canAccessFinance && !user.canAccessChildren) {
                 byAccess.merge("Apoio sem acesso operacional", 1L, Long::sum);
             }
         });
@@ -189,6 +194,7 @@ public class UserService {
                 + "\",\"additionalTeams\":\"" + safe(String.join(", ", extraTeams))
                 + "\",\"active\":" + user.active + ",\"canRegisterVisits\":" + user.canRegisterVisits
                 + ",\"canViewReports\":" + user.canViewReports + ",\"canAccessFinance\":" + user.canAccessFinance
+                + ",\"canAccessChildren\":" + user.canAccessChildren
                 + ",\"mustChangePassword\":" + user.mustChangePassword + "}";
     }
 

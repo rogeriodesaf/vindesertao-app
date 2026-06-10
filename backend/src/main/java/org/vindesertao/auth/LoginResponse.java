@@ -17,7 +17,8 @@ public record LoginResponse(
             boolean mustChangePassword,
             boolean canRegisterVisits,
             boolean canViewReports,
-            boolean canAccessFinance
+            boolean canAccessFinance,
+            boolean canAccessChildren
     ) {
     }
 }

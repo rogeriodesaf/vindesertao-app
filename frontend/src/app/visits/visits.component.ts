@@ -267,6 +267,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       if (fullVisit.latitude && fullVisit.longitude) {
         this.selectPoint(fullVisit.latitude, fullVisit.longitude);
         this.map?.setView([fullVisit.latitude, fullVisit.longitude], 17);
+        this.scrollMapIntoView();
       }
     });
   }
@@ -278,6 +279,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     }
     if (visit.latitude && visit.longitude) {
       this.map?.setView([visit.latitude, visit.longitude], 18);
+      this.scrollMapIntoView();
     }
   }
 
@@ -590,6 +592,12 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.online.set(false);
     this.notifications.info('Você está sem internet. Novas fichas serão salvas no aparelho.');
   };
+
+  private scrollMapIntoView(): void {
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches) {
+      window.setTimeout(() => document.querySelector('.map-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+    }
+  }
 
   private ok(message: string): void {
     this.message.set(message);

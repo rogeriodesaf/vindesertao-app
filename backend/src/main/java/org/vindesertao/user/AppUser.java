@@ -52,6 +52,9 @@ public class AppUser extends PanacheEntityBase {
     @Column(name = "can_access_finance", nullable = false)
     public boolean canAccessFinance = false;
 
+    @Column(name = "can_access_children", nullable = false)
+    public boolean canAccessChildren = false;
+
     @Column(name = "created_at", nullable = false)
     public OffsetDateTime createdAt = OffsetDateTime.now();
 
