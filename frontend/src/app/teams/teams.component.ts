@@ -38,8 +38,8 @@ const teamTypes: Array<{ value: TeamType; label: string }> = [
         }
       </div>
 
-      <div class="teams-layout" [class.member-view]="!isAdmin()">
-        @if (isAdmin()) {
+      <div class="teams-layout" [class.member-view]="!isAdmin()" [class.focused-mobile]="mobileFocusedTeam()">
+        @if (isAdmin() && !mobileFocusedTeam()) {
           <form #teamForm="ngForm" class="editor" novalidate (ngSubmit)="save(teamForm)">
             <h2>{{ form.id ? 'Editar equipe' : 'Nova equipe' }}</h2>
             <label>Nome da equipe<input name="name" [(ngModel)]="form.name" required></label>
@@ -99,7 +99,12 @@ const teamTypes: Array<{ value: TeamType; label: string }> = [
                 <span>Tipo: {{ teamTypeLabel(team.teamType) }} | {{ team.canRegisterVisits ? 'Registra visitas' : 'Equipe de apoio' }}</span>
               </div>
               @if (isAdmin()) {
-                <button type="button" class="secondary" (click)="edit(team)">Editar</button>
+                <div class="actions">
+                  @if (mobileFocusedTeam()) {
+                    <button type="button" class="secondary" (click)="backToTeams()">Voltar para equipes</button>
+                  }
+                  <button type="button" class="secondary" (click)="edit(team)">Editar</button>
+                </div>
               }
             </div>
 
@@ -164,6 +169,7 @@ export class TeamsComponent implements OnInit {
   users = signal<AppUser[]>([]);
   myTeamMembers = signal<TeamMember[]>([]);
   selectedTeam = signal<Team | null>(null);
+  mobileFocusedTeam = signal(false);
   teamVisits = signal<Visit[]>([]);
   message = signal('');
   error = signal('');
@@ -219,7 +225,11 @@ export class TeamsComponent implements OnInit {
     this.form = { ...team };
     this.message.set('');
     this.error.set('');
+    this.mobileFocusedTeam.set(this.isCompactScreen());
     this.loadTeamVisits(team);
+    if (this.mobileFocusedTeam()) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 
   isAdmin(): boolean {
@@ -230,14 +240,21 @@ export class TeamsComponent implements OnInit {
     this.form = { ...team };
     this.message.set('');
     this.error.set('');
+    this.mobileFocusedTeam.set(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   newTeam(): void {
     this.form = this.blank();
     this.selectedTeam.set(null);
     this.teamVisits.set([]);
+    this.mobileFocusedTeam.set(false);
     this.message.set('');
     this.error.set('');
+  }
+
+  backToTeams(): void {
+    this.mobileFocusedTeam.set(false);
   }
 
   save(form: NgForm): void {
@@ -285,6 +302,10 @@ export class TeamsComponent implements OnInit {
       },
       error: (response: HttpErrorResponse) => this.error.set(this.errorMessage(response))
     });
+  }
+
+  private isCompactScreen(): boolean {
+    return typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches;
   }
 
   roleNames(roles: string[]): string {
