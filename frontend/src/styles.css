@@ -350,6 +350,46 @@ tbody tr:hover { background: #f3f7f4; }
   overflow: hidden;
 }
 .duplicate-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.support-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; align-items: start; }
+.support-warning {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid #eed7b7;
+  border-left: 6px solid var(--accent);
+  border-radius: 8px;
+  background: #fff8ed;
+}
+.support-warning strong { color: #8a4a1f; }
+.support-chat, .support-answer, .support-empty {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+}
+.support-chat { display: grid; gap: 14px; }
+.support-chat textarea { min-height: 96px; }
+.support-answer { display: grid; gap: 10px; }
+.support-answer > span {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: var(--brand-strong);
+  background: #e8f3eb;
+  font-size: 12px;
+  font-weight: 800;
+}
+.support-answer p { margin: 0; line-height: 1.55; }
+.support-answer small, .pastoral-note small { color: var(--muted); }
+.pastoral-note {
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+.support-library { gap: 12px; }
+.category-filter { display: flex; gap: 8px; flex-wrap: wrap; }
+.selected-chip { background: var(--brand) !important; color: #ffffff !important; }
 .selectable { cursor: pointer; align-items: start; justify-content: start; }
 .selectable input { width: auto; min-height: auto; margin-top: 3px; }
 .color-dot {
@@ -438,7 +478,7 @@ tbody tr:hover { background: #f3f7f4; }
   .map-toolbar { grid-template-columns: 1fr 1fr; right: 12px; left: 12px; top: 12px; }
   .map-toolbar input { grid-column: 1 / -1; }
   .map-toolbar button, .map-toolbar .button { width: 100%; }
-  .metric-grid, .analytics-grid, .profile-summary, .team-report-grid, .split, .social-layout, .social-analytics, .teams-layout, .territory-layout, .duplicate-grid { grid-template-columns: 1fr; }
+  .metric-grid, .analytics-grid, .profile-summary, .team-report-grid, .split, .social-layout, .social-analytics, .support-layout, .teams-layout, .territory-layout, .duplicate-grid { grid-template-columns: 1fr; }
   .territory-map { min-height: max(68vh, 560px); }
   .page { padding: 14px; gap: 14px; }
   .page-head, .date-filters, .report-actions { align-items: stretch; flex-direction: column; }

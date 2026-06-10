@@ -27,6 +27,7 @@ import { NotificationService } from './core/notification.service';
               <a routerLink="/dashboard" (click)="closeMenu()">Dashboard</a>
             }
             <a routerLink="/social-assistance" (click)="closeMenu()">Ação Social</a>
+            <a routerLink="/evangelistic-support" (click)="closeMenu()">Apoio Evangelístico</a>
             @if (user.roles.includes('admin') || user.canAccessFinance) {
               <a routerLink="/finance" (click)="closeMenu()">Financeiro</a>
             }
