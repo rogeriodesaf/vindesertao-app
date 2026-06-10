@@ -272,13 +272,15 @@ h2 { font-size: 17px; }
   align-items: center;
 }
 .split { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 18px; }
+.social-layout { grid-template-columns: 380px minmax(0, 1fr); align-items: start; }
+.social-analytics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .editor, .table-wrap {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 16px;
 }
-.table-wrap { overflow-x: auto; }
+.table-wrap, .responsive-table { overflow-x: auto; }
 .role-box { display: grid; gap: 6px; }
 .list-head, .pagination {
   display: flex;
@@ -393,7 +395,7 @@ tbody tr:hover { background: #f3f7f4; }
   .map-toolbar { grid-template-columns: 1fr 1fr; right: 12px; left: 12px; top: 12px; }
   .map-toolbar input { grid-column: 1 / -1; }
   .map-toolbar button, .map-toolbar .button { width: 100%; }
-  .metric-grid, .analytics-grid, .profile-summary, .team-report-grid, .split, .teams-layout, .territory-layout, .duplicate-grid { grid-template-columns: 1fr; }
+  .metric-grid, .analytics-grid, .profile-summary, .team-report-grid, .split, .social-layout, .social-analytics, .teams-layout, .territory-layout, .duplicate-grid { grid-template-columns: 1fr; }
   .territory-map { min-height: max(68vh, 560px); }
   .page { padding: 14px; gap: 14px; }
   .page-head, .date-filters, .report-actions { align-items: stretch; flex-direction: column; }

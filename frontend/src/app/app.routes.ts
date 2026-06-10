@@ -9,12 +9,14 @@ import { TeamsComponent } from './teams/teams.component';
 import { TerritoriesComponent } from './territories/territories.component';
 import { UsersComponent } from './users/users.component';
 import { VisitsComponent } from './visits/visits.component';
+import { SocialAssistanceComponent } from './social-assistance/social-assistance.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
   { path: 'change-password', component: ChangePasswordComponent, canActivate: [authGuard] },
   { path: 'visits', component: VisitsComponent, canActivate: [authGuard] },
   { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard], data: { canViewReports: true } },
+  { path: 'social-assistance', component: SocialAssistanceComponent, canActivate: [authGuard], data: { roles: ['admin', 'lider', 'projetista'] } },
   { path: 'teams', component: TeamsComponent, canActivate: [authGuard], data: { roles: ['admin', 'lider', 'projetista'] } },
   { path: 'users', component: UsersComponent, canActivate: [authGuard], data: { roles: ['admin'] } },
   { path: 'territories', component: TerritoriesComponent, canActivate: [authGuard], data: { roles: ['admin'] } },

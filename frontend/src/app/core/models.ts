@@ -167,3 +167,33 @@ export interface UserSummary {
   byPrimaryTeamType: UserSummaryItem[];
   byAccess: UserSummaryItem[];
 }
+
+export type SocialServiceType = 'MEDICAL' | 'DENTAL' | 'HAIRCUT' | 'MANICURE' | 'SPEECH_THERAPY' | 'NUTRITION' | 'FOOD_BASKET' | 'OTHER';
+
+export interface SocialAssistanceRecord {
+  id?: number;
+  assistedPersonName: string;
+  phone?: string;
+  age?: number;
+  neighborhood?: string;
+  city: string;
+  serviceType: SocialServiceType;
+  serviceTypeLabel?: string;
+  quantity: number;
+  notes?: string;
+  responsibleUserId?: number;
+  responsibleUserName?: string;
+  teamId?: number;
+  teamName?: string;
+  createdAt?: string;
+}
+
+export interface SocialAssistanceSummary {
+  totalPeople: number;
+  totalRecords: number;
+  byServiceType: CountItem[];
+  byTeam: CountItem[];
+  byResponsible: CountItem[];
+  byNeighborhood: CountItem[];
+  byPeriod: CountItem[];
+}

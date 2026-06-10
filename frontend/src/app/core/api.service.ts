@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { environment } from '../../environments/environment';
-import { AppUser, AuditLog, Dashboard, DuplicateVisitGroup, LoginResponse, PageResponse, Team, TeamDetail, Territory, UserSummary, UserTeamHistory, Visit } from './models';
+import { AppUser, AuditLog, Dashboard, DuplicateVisitGroup, LoginResponse, PageResponse, SocialAssistanceRecord, SocialAssistanceSummary, Team, TeamDetail, Territory, UserSummary, UserTeamHistory, Visit } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -100,6 +100,29 @@ export class ApiService {
 
   auditLogs(params: Record<string, string | number | undefined>) {
     return this.http.get<PageResponse<AuditLog>>(`${environment.apiBaseUrl}/audit`, { params: this.params(params) });
+  }
+
+  socialAssistance(params: Record<string, string | number | undefined>) {
+    return this.http.get<PageResponse<SocialAssistanceRecord>>(`${environment.apiBaseUrl}/social-assistance`, { params: this.params(params) });
+  }
+
+  socialAssistanceSummary(params: Record<string, string | number | undefined>) {
+    return this.http.get<SocialAssistanceSummary>(`${environment.apiBaseUrl}/social-assistance/summary`, { params: this.params(params) });
+  }
+
+  createSocialAssistance(record: SocialAssistanceRecord) {
+    return this.http.post<SocialAssistanceRecord>(`${environment.apiBaseUrl}/social-assistance`, record);
+  }
+
+  updateSocialAssistance(record: SocialAssistanceRecord) {
+    return this.http.put<SocialAssistanceRecord>(`${environment.apiBaseUrl}/social-assistance/${record.id}`, record);
+  }
+
+  exportSocialAssistance(params: Record<string, string | number | undefined> = {}) {
+    return this.http.get(`${environment.apiBaseUrl}/social-assistance/export.xlsx`, {
+      params: this.params(params),
+      responseType: 'blob'
+    });
   }
 
   exportVisitsUrl(params: Record<string, string | number | boolean | undefined> = {}): string {

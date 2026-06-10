@@ -25,6 +25,7 @@ import { AuthService } from './core/auth.service';
             @if (user.roles.includes('admin') || user.roles.includes('lider') || user.canViewReports || user.canRegisterVisits) {
               <a routerLink="/dashboard" (click)="closeMenu()">Dashboard</a>
             }
+            <a routerLink="/social-assistance" (click)="closeMenu()">Ação Social</a>
             @if (user.roles.includes('admin')) {
               <a routerLink="/teams" (click)="closeMenu()">Equipes</a>
               <a routerLink="/users" (click)="closeMenu()">Usuarios</a>

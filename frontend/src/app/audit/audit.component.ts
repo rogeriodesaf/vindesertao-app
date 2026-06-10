@@ -137,6 +137,9 @@ export class AuditComponent implements OnInit {
     if (log.entityType === 'VISIT') {
       return `Ficha de ${data['personName'] || 'morador nao informado'}, responsavel ${data['responsible'] || 'nao informado'}, equipe ${data['team'] || 'sem equipe'}.`;
     }
+    if (log.entityType === 'SOCIAL_ASSISTANCE') {
+      return `Atendimento de ${data['assistedPersonName'] || 'pessoa nao informada'}, tipo ${data['serviceType'] || 'nao informado'}, quantidade ${data['quantity'] || 1}, equipe ${data['team'] || 'sem equipe'}.`;
+    }
     return 'Registro administrativo atualizado.';
   }
 
@@ -154,7 +157,8 @@ export class AuditComponent implements OnInit {
       USER: 'Usuario',
       TEAM: 'Equipe',
       VISIT: 'Ficha de visita',
-      TERRITORY: 'Territorio'
+      TERRITORY: 'Territorio',
+      SOCIAL_ASSISTANCE: 'Atendimento social'
     };
     return labels[entity] || entity;
   }
