@@ -174,13 +174,14 @@ export class DashboardComponent implements OnInit {
   printReport(): void {
     const printWindow = window.open('', '_blank', 'width=1200,height=800');
     if (!printWindow) {
-      window.print();
+      alert('Não foi possível abrir o relatório em uma nova aba. Libere pop-ups para gerar o PDF sem sair do sistema.');
       return;
     }
     const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
       .map((node) => node.outerHTML)
       .join('\n');
     const dashboard = document.querySelector('.page')?.outerHTML ?? '';
+    const shouldAutoPrint = !this.isCompactScreen();
     printWindow.document.write(`
       <!doctype html>
       <html lang="pt-BR">
@@ -188,13 +189,52 @@ export class DashboardComponent implements OnInit {
           <meta charset="utf-8">
           <title>Relatorio de visitas</title>
           ${styles}
+          <style>
+            .print-toolbar {
+              position: sticky;
+              top: 0;
+              z-index: 9999;
+              display: flex;
+              gap: 10px;
+              justify-content: flex-end;
+              padding: 12px;
+              background: #ffffff;
+              border-bottom: 1px solid #dbe3dc;
+            }
+            .print-toolbar button {
+              min-height: 40px;
+              border: 0;
+              border-radius: 6px;
+              padding: 0 14px;
+              background: #276749;
+              color: #ffffff;
+              font: inherit;
+              font-weight: 700;
+            }
+            .print-toolbar button.secondary {
+              background: #eef2ee;
+              color: #1d2a24;
+              border: 1px solid #dbe3dc;
+            }
+            @media print {
+              .print-toolbar { display: none !important; }
+            }
+          </style>
         </head>
-        <body>${dashboard}</body>
+        <body>
+          <div class="print-toolbar">
+            <button type="button" class="secondary" onclick="if (window.opener) { window.close(); } else { window.location.href='${this.escapeAttribute(window.location.href)}'; }">Voltar ao sistema</button>
+            <button type="button" onclick="window.print()">Gerar PDF</button>
+          </div>
+          ${dashboard}
+        </body>
       </html>
     `);
     printWindow.document.close();
     printWindow.focus();
-    setTimeout(() => printWindow.print(), 500);
+    if (shouldAutoPrint) {
+      setTimeout(() => printWindow.print(), 500);
+    }
   }
 
   saveGoal(): void {
@@ -256,6 +296,19 @@ export class DashboardComponent implements OnInit {
 
   private fileDate(): string {
     return new Date().toISOString().slice(0, 10);
+  }
+
+  private isCompactScreen(): boolean {
+    return typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches;
+  }
+
+  private escapeAttribute(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
   }
 
   private slug(value: string): string {
