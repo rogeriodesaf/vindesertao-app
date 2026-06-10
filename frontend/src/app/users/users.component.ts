@@ -21,6 +21,7 @@ const roles: Role[] = ['admin', 'lider', 'projetista'];
       </div>
 
       @if (summary(); as data) {
+        @if (showSummary()) {
         <div class="profile-summary">
           <section>
             <h2>Pessoas por perfil</h2>
@@ -41,9 +42,11 @@ const roles: Role[] = ['admin', 'lider', 'projetista'];
             }
           </section>
         </div>
+        }
       }
 
       <div class="split">
+        @if (showForm()) {
         <form #userForm="ngForm" class="editor" novalidate (ngSubmit)="save(userForm)">
           <h2>{{ form.id ? 'Editar usuario' : 'Novo usuario' }}</h2>
           <label>Nome<input name="name" [(ngModel)]="form.name" required></label>
@@ -87,7 +90,12 @@ const roles: Role[] = ['admin', 'lider', 'projetista'];
           @if (error()) {
             <p class="error">{{ error() }}</p>
           }
-          <button type="submit">Salvar</button>
+          <div class="actions">
+            <button type="submit">Salvar</button>
+            @if (isCompactScreen()) {
+              <button type="button" class="secondary" (click)="backToList()">Voltar para lista</button>
+            }
+          </div>
 
           @if (form.id) {
             <section class="detail-section compact-history">
@@ -106,8 +114,10 @@ const roles: Role[] = ['admin', 'lider', 'projetista'];
             </section>
           }
         </form>
+        }
 
-        <div class="table-wrap">
+        @if (showTable()) {
+        <div class="table-wrap users-table">
           <div class="list-head">
             <div>
               <h2>{{ showInactive ? 'Todos os usuarios' : 'Usuarios ativos' }}</h2>
@@ -153,6 +163,7 @@ const roles: Role[] = ['admin', 'lider', 'projetista'];
             <button type="button" class="secondary" [disabled]="pageIndex() + 1 >= totalPages()" (click)="nextPage()">Proxima</button>
           </div>
         </div>
+        }
       </div>
     </section>
   `
@@ -167,6 +178,7 @@ export class UsersComponent implements OnInit {
   totalPages = signal(1);
   teamHistory = signal<UserTeamHistory[]>([]);
   summary = signal<UserSummary | null>(null);
+  mobileFormOpen = signal(false);
   showInactive = false;
   pageSize = 5;
   availableRoles = roles;
@@ -204,6 +216,7 @@ export class UsersComponent implements OnInit {
     this.form = { ...user, password: '' };
     this.message.set('');
     this.error.set('');
+    this.openFormOnMobile();
     if (user.id) {
       this.api.userTeamHistory(user.id).subscribe((history) => this.teamHistory.set(history));
     }
@@ -214,6 +227,7 @@ export class UsersComponent implements OnInit {
     this.teamHistory.set([]);
     this.message.set('');
     this.error.set('');
+    this.openFormOnMobile();
   }
 
   save(form: NgForm): void {
@@ -233,6 +247,7 @@ export class UsersComponent implements OnInit {
         this.ok(this.form.id ? 'Usuário atualizado com sucesso.' : 'Usuário salvo com sucesso.');
         this.form = this.blank();
         this.pageIndex.set(0);
+        this.backToList();
         this.load();
         this.loadSummary();
       },
@@ -266,6 +281,7 @@ export class UsersComponent implements OnInit {
     }
     this.pageIndex.update((page) => page - 1);
     this.load();
+    this.scrollToUsersTable();
   }
 
   nextPage(): void {
@@ -274,16 +290,36 @@ export class UsersComponent implements OnInit {
     }
     this.pageIndex.update((page) => page + 1);
     this.load();
+    this.scrollToUsersTable();
   }
 
   changePageSize(): void {
     this.pageIndex.set(0);
     this.load();
+    this.scrollToUsersTable();
   }
 
   toggleInactive(): void {
     this.pageIndex.set(0);
     this.load();
+    this.scrollToUsersTable();
+  }
+
+  showSummary(): boolean {
+    return !this.isCompactScreen();
+  }
+
+  showForm(): boolean {
+    return !this.isCompactScreen() || this.mobileFormOpen();
+  }
+
+  showTable(): boolean {
+    return !this.isCompactScreen() || !this.mobileFormOpen();
+  }
+
+  backToList(): void {
+    this.mobileFormOpen.set(false);
+    this.scrollToUsersTable();
   }
 
   private blank(): AppUser {
@@ -338,5 +374,22 @@ export class UsersComponent implements OnInit {
   private fail(message: string): void {
     this.error.set(message);
     this.notifications.error(message);
+  }
+
+  isCompactScreen(): boolean {
+    return typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches;
+  }
+
+  private openFormOnMobile(): void {
+    if (this.isCompactScreen()) {
+      this.mobileFormOpen.set(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  private scrollToUsersTable(): void {
+    if (this.isCompactScreen()) {
+      window.setTimeout(() => document.querySelector('.users-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+    }
   }
 }
