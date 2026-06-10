@@ -255,7 +255,7 @@ export class FinanceComponent implements OnInit {
   }
 
   showSummary(): boolean {
-    return !this.isCompactScreen();
+    return !this.isCompactScreen() || !this.mobileFormOpen();
   }
 
   showForm(): boolean {
@@ -263,7 +263,7 @@ export class FinanceComponent implements OnInit {
   }
 
   showReport(): boolean {
-    return !this.isCompactScreen();
+    return !this.isCompactScreen() || !this.mobileFormOpen();
   }
 
   showTable(): boolean {

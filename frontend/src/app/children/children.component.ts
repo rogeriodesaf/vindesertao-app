@@ -233,7 +233,7 @@ export class ChildrenComponent implements OnInit {
   }
 
   showReport(): boolean {
-    return !this.isCompactScreen();
+    return !this.isCompactScreen() || !this.mobileFormOpen();
   }
 
   showTable(): boolean {
