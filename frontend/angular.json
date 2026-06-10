@@ -18,7 +18,11 @@
             "browser": "src/main.ts",
             "polyfills": ["zone.js"],
             "tsConfig": "tsconfig.app.json",
-            "assets": ["src/assets"],
+            "assets": [
+              "src/assets",
+              "src/manifest.webmanifest",
+              "src/sw.js"
+            ],
             "styles": ["node_modules/leaflet/dist/leaflet.css", "src/styles.css"],
             "allowedCommonJsDependencies": ["leaflet"]
           },
@@ -61,7 +65,11 @@
           "options": {
             "polyfills": ["zone.js", "zone.js/testing"],
             "tsConfig": "tsconfig.spec.json",
-            "assets": ["src/assets"],
+            "assets": [
+              "src/assets",
+              "src/manifest.webmanifest",
+              "src/sw.js"
+            ],
             "styles": ["node_modules/leaflet/dist/leaflet.css", "src/styles.css"]
           }
         }

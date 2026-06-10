@@ -9,6 +9,7 @@ import { AuthService } from '../core/auth.service';
 import { formatDateTime } from '../core/date-format';
 import { Territory, Visit } from '../core/models';
 import { NotificationService } from '../core/notification.service';
+import { OfflineVisitQueueService } from '../core/offline-visit-queue.service';
 
 @Component({
   selector: 'app-visits',
@@ -26,6 +27,18 @@ import { NotificationService } from '../core/notification.service';
       </div>
 
       <aside class="side-panel">
+        @if (canManageVisits()) {
+          <section class="offline-card" [class.offline-card-warning]="!online() || offlineQueue.pendingCount() > 0">
+            <div>
+              <strong>{{ online() ? 'Modo online' : 'Sem internet' }}</strong>
+              <span>{{ offlineStatusText() }}</span>
+            </div>
+            @if (offlineQueue.pendingCount() > 0) {
+              <button type="button" class="secondary" (click)="syncOfflineVisits()">Sincronizar agora</button>
+            }
+          </section>
+        }
+
         @if (canManageVisits()) {
           <h2>{{ editingId() ? 'Editar visita' : 'Nova visita' }}</h2>
           <form #visitForm="ngForm" novalidate (ngSubmit)="save(visitForm)">
@@ -134,6 +147,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   editingId = signal<number | null>(null);
   message = signal('');
   error = signal('');
+  online = signal(typeof navigator === 'undefined' ? true : navigator.onLine);
   searchText = '';
   private map?: L.Map;
   private marker?: L.Marker;
@@ -142,7 +156,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   private refreshHandle?: ReturnType<typeof setInterval>;
   private fittedInitialContent = false;
 
-  constructor(public api: ApiService, private http: HttpClient, private auth: AuthService, private zone: NgZone, private notifications: NotificationService) {}
+  constructor(public api: ApiService, private http: HttpClient, private auth: AuthService, private zone: NgZone, private notifications: NotificationService, public offlineQueue: OfflineVisitQueueService) {}
 
   ngAfterViewInit(): void {
     this.map = L.map('visit-map', { zoomControl: false }).setView([-7.229, -39.313], 13);
@@ -163,12 +177,17 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     if (!this.canManageVisits()) {
       this.refreshHandle = setInterval(() => this.loadVisits(), 30000);
     }
+    window.addEventListener('online', this.handleOnline);
+    window.addEventListener('offline', this.handleOffline);
+    this.offlineQueue.refreshCount();
   }
 
   ngOnDestroy(): void {
     if (this.refreshHandle) {
       clearInterval(this.refreshHandle);
     }
+    window.removeEventListener('online', this.handleOnline);
+    window.removeEventListener('offline', this.handleOffline);
     this.map?.remove();
   }
 
@@ -234,7 +253,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         this.resetForm();
         this.loadVisits();
       },
-      error: (response: HttpErrorResponse) => this.fail(this.errorMessage(response))
+      error: (response: HttpErrorResponse) => this.handleSaveError(response, payload, editing)
     });
   }
 
@@ -513,6 +532,64 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     }
     return 'Nao foi possivel salvar. Revise os campos e tente novamente.';
   }
+
+  offlineStatusText(): string {
+    const pending = this.offlineQueue.pendingCount();
+    if (!this.online()) {
+      return pending
+        ? `${pending} ficha(s) salva(s) no aparelho aguardando internet.`
+        : 'Se a conexão falhar, novas fichas serão guardadas no aparelho.';
+    }
+    return pending
+      ? `${pending} ficha(s) pendente(s) para enviar ao servidor.`
+      : 'As fichas estão sendo enviadas diretamente ao servidor.';
+  }
+
+  syncOfflineVisits(): void {
+    if (!this.online()) {
+      this.notifications.info('Ainda sem internet. As fichas continuam salvas no aparelho.');
+      return;
+    }
+    this.offlineQueue.sync().then((result) => {
+      if (result.sent > 0) {
+        this.ok(`${result.sent} ficha(s) offline sincronizada(s) com sucesso.`);
+        this.loadVisits();
+      }
+      if (result.failed > 0) {
+        this.fail(`${result.failed} ficha(s) ainda não puderam ser sincronizadas.`);
+      }
+      if (result.sent === 0 && result.failed === 0) {
+        this.notifications.info('Não há fichas pendentes para sincronizar.');
+      }
+    });
+  }
+
+  private handleSaveError(response: HttpErrorResponse, payload: Visit, editing: boolean): void {
+    if (!editing && this.isOfflineError(response)) {
+      this.offlineQueue.enqueue(payload).then(() => {
+        this.ok('Sem conexão. A ficha foi salva no aparelho e será enviada quando a internet voltar.');
+        this.resetForm();
+      }).catch(() => this.fail('Não foi possível salvar a ficha no aparelho.'));
+      return;
+    }
+    this.fail(this.errorMessage(response));
+  }
+
+  private isOfflineError(response: HttpErrorResponse): boolean {
+    return !navigator.onLine || response.status === 0;
+  }
+
+  private handleOnline = (): void => {
+    this.online.set(true);
+    if (this.offlineQueue.pendingCount() > 0) {
+      this.syncOfflineVisits();
+    }
+  };
+
+  private handleOffline = (): void => {
+    this.online.set(false);
+    this.notifications.info('Você está sem internet. Novas fichas serão salvas no aparelho.');
+  };
 
   private ok(message: string): void {
     this.message.set(message);
