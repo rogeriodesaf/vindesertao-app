@@ -17,7 +17,7 @@ import { AuditLog } from '../core/models';
         </div>
       </div>
 
-      <div class="table-wrap">
+      <div class="table-wrap audit-table">
         <div class="list-head">
           <div>
             <h2>Eventos recentes</h2>
@@ -73,11 +73,13 @@ export class AuditComponent implements OnInit {
   previousPage(): void {
     this.pageIndex.update((page) => Math.max(0, page - 1));
     this.load();
+    this.scrollToTable();
   }
 
   nextPage(): void {
     this.pageIndex.update((page) => page + 1);
     this.load();
+    this.scrollToTable();
   }
 
   formatDate(value: string): string {
@@ -189,6 +191,12 @@ export class AuditComponent implements OnInit {
       return parsed && typeof parsed === 'object' ? parsed : {};
     } catch {
       return {};
+    }
+  }
+
+  private scrollToTable(): void {
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches) {
+      window.setTimeout(() => document.querySelector('.audit-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
     }
   }
 }

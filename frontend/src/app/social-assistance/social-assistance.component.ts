@@ -21,6 +21,7 @@ import { NotificationService } from '../core/notification.service';
           <label>Data inicial<input type="datetime-local" [(ngModel)]="from"></label>
           <label>Data final<input type="datetime-local" [(ngModel)]="to"></label>
           <button type="button" (click)="load()">Filtrar</button>
+          <button type="button" class="secondary" (click)="newRecord()">Novo atendimento</button>
         </div>
       </div>
 
@@ -32,6 +33,7 @@ import { NotificationService } from '../core/notification.service';
       }
 
       <div class="split social-layout">
+        @if (showForm()) {
         <form #socialForm="ngForm" class="editor" novalidate (ngSubmit)="save(socialForm)">
           <h2>{{ form.id ? 'Editar atendimento' : 'Novo atendimento' }}</h2>
           <label>Nome da pessoa atendida<input name="assistedPersonName" [(ngModel)]="form.assistedPersonName" required></label>
@@ -65,9 +67,14 @@ import { NotificationService } from '../core/notification.service';
           <div class="actions">
             <button type="submit">Salvar atendimento</button>
             <button type="button" class="secondary" (click)="reset(socialForm)">Limpar</button>
+            @if (isCompactScreen()) {
+              <button type="button" class="secondary" (click)="backToList()">Voltar para lista</button>
+            }
           </div>
         </form>
+        }
 
+        @if (showReport()) {
         <section class="detail-card">
           <div class="detail-head">
             <div>
@@ -111,9 +118,11 @@ import { NotificationService } from '../core/notification.service';
             </div>
           }
         </section>
+        }
       </div>
 
-      <section class="detail-card">
+      @if (showTable()) {
+      <section class="detail-card social-table">
         <div class="list-head">
           <div>
             <h2>Atendimentos cadastrados</h2>
@@ -162,6 +171,7 @@ import { NotificationService } from '../core/notification.service';
           <button type="button" class="secondary" [disabled]="currentPage + 1 >= (page()?.pages || 1)" (click)="goToPage(currentPage + 1)">Próxima</button>
         </div>
       </section>
+      }
     </section>
   `
 })
@@ -177,6 +187,7 @@ export class SocialAssistanceComponent implements OnInit {
   serviceType = '';
   currentPage = 0;
   pageSize = 5;
+  mobileFormOpen = signal(false);
 
   serviceTypes: Array<{ value: SocialServiceType; label: string }> = [
     { value: 'MEDICAL', label: 'Atendimento médico' },
@@ -212,6 +223,11 @@ export class SocialAssistanceComponent implements OnInit {
     this.api.socialAssistanceSummary(params).subscribe((summary) => this.summary.set(summary));
   }
 
+  newRecord(): void {
+    this.reset();
+    this.openFormOnMobile();
+  }
+
   save(form: NgForm): void {
     this.message.set('');
     this.error.set('');
@@ -225,6 +241,7 @@ export class SocialAssistanceComponent implements OnInit {
       next: () => {
         this.ok(editing ? 'Atendimento social atualizado com sucesso.' : 'Atendimento social salvo com sucesso.');
         this.reset(form);
+        this.backToList();
         this.load();
       },
       error: (error) => this.fail(this.errorMessage(error))
@@ -233,7 +250,7 @@ export class SocialAssistanceComponent implements OnInit {
 
   edit(record: SocialAssistanceRecord): void {
     this.form = { ...record };
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    this.openFormOnMobile();
   }
 
   reset(form?: NgForm): void {
@@ -244,6 +261,24 @@ export class SocialAssistanceComponent implements OnInit {
   goToPage(page: number): void {
     this.currentPage = Math.max(0, page);
     this.load();
+    this.scrollToTable();
+  }
+
+  showForm(): boolean {
+    return !this.isCompactScreen() || this.mobileFormOpen();
+  }
+
+  showReport(): boolean {
+    return !this.isCompactScreen();
+  }
+
+  showTable(): boolean {
+    return !this.isCompactScreen() || !this.mobileFormOpen();
+  }
+
+  backToList(): void {
+    this.mobileFormOpen.set(false);
+    this.scrollToTable();
   }
 
   downloadExcel(): void {
@@ -306,5 +341,22 @@ export class SocialAssistanceComponent implements OnInit {
   private fail(message: string): void {
     this.error.set(message);
     this.notifications.error(message);
+  }
+
+  isCompactScreen(): boolean {
+    return typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches;
+  }
+
+  private openFormOnMobile(): void {
+    if (this.isCompactScreen()) {
+      this.mobileFormOpen.set(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  private scrollToTable(): void {
+    if (this.isCompactScreen()) {
+      window.setTimeout(() => document.querySelector('.social-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+    }
   }
 }
