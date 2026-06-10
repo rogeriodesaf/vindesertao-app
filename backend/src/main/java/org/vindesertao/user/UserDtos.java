@@ -21,6 +21,7 @@ public class UserDtos {
             boolean mustChangePassword,
             boolean canRegisterVisits,
             boolean canViewReports,
+            boolean canAccessFinance,
             List<Long> additionalTeamIds,
             List<String> additionalTeamNames
     ) {
@@ -36,6 +37,7 @@ public class UserDtos {
                     user.mustChangePassword,
                     user.canRegisterVisits,
                     user.canViewReports,
+                    user.canAccessFinance,
                     memberships.stream().map(membership -> membership.team.id).toList(),
                     memberships.stream().map(membership -> membership.team.name).toList()
             );
@@ -51,7 +53,8 @@ public class UserDtos {
             List<Long> additionalTeamIds,
             boolean active,
             boolean canRegisterVisits,
-            boolean canViewReports
+            boolean canViewReports,
+            boolean canAccessFinance
     ) {
     }
 
@@ -63,6 +66,7 @@ public class UserDtos {
             boolean active,
             boolean canRegisterVisits,
             boolean canViewReports,
+            boolean canAccessFinance,
             String password
     ) {
     }

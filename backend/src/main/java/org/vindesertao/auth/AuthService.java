@@ -64,10 +64,11 @@ public class AuthService {
                 .claim("must_change_password", user.mustChangePassword)
                 .claim("can_register_visits", user.canRegisterVisits)
                 .claim("can_view_reports", user.canViewReports)
+                .claim("can_access_finance", user.canAccessFinance)
                 .expiresIn(TOKEN_TTL)
                 .sign();
         return new LoginResponse(token, "Bearer", expiresIn,
                 new LoginResponse.UserPrincipal(user.id, user.name, user.email, user.roleSet(), user.team == null ? null : user.team.id,
-                        user.mustChangePassword, user.canRegisterVisits, user.canViewReports));
+                        user.mustChangePassword, user.canRegisterVisits, user.canViewReports, user.canAccessFinance));
     }
 }

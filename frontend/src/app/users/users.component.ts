@@ -84,6 +84,7 @@ const roles: Role[] = ['admin', 'lider', 'projetista'];
           <label class="check-row"><input name="active" type="checkbox" [(ngModel)]="form.active"> Ativo</label>
           <label class="check-row"><input name="canRegisterVisits" type="checkbox" [(ngModel)]="form.canRegisterVisits"> Pode registrar visitas</label>
           <label class="check-row"><input name="canViewReports" type="checkbox" [(ngModel)]="form.canViewReports"> Pode ver relatórios da equipe</label>
+          <label class="check-row"><input name="canAccessFinance" type="checkbox" [(ngModel)]="form.canAccessFinance"> Pode acessar financeiro</label>
           @if (message()) {
             <p class="success">{{ message() }}</p>
           }
@@ -323,7 +324,7 @@ export class UsersComponent implements OnInit {
   }
 
   private blank(): AppUser {
-    return { name: '', email: '', password: '', roles: ['projetista'], active: true, canRegisterVisits: true, canViewReports: false, additionalTeamIds: [] };
+    return { name: '', email: '', password: '', roles: ['projetista'], active: true, canRegisterVisits: true, canViewReports: false, canAccessFinance: false, additionalTeamIds: [] };
   }
 
   accessSummary(user: AppUser): string {
@@ -333,6 +334,9 @@ export class UsersComponent implements OnInit {
     }
     if (user.canViewReports) {
       access.push('relatórios');
+    }
+    if (user.canAccessFinance) {
+      access.push('financeiro');
     }
     return access.length ? access.join(', ') : 'apoio';
   }

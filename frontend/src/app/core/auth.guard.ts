@@ -20,5 +20,8 @@ export const authGuard: CanActivateFn = (route) => {
   if (route.data['canViewReports'] && !auth.user()?.canViewReports && !auth.user()?.canRegisterVisits && !auth.hasAnyRole(['admin', 'lider'])) {
     return router.parseUrl('/visits');
   }
+  if (route.data['canAccessFinance'] && !auth.user()?.canAccessFinance && !auth.hasAnyRole(['admin'])) {
+    return router.parseUrl('/visits');
+  }
   return true;
 };

@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { environment } from '../../environments/environment';
-import { AppUser, AuditLog, Dashboard, DuplicateVisitGroup, LoginResponse, PageResponse, SocialAssistanceRecord, SocialAssistanceSummary, Team, TeamDetail, Territory, UserSummary, UserTeamHistory, Visit } from './models';
+import { AppUser, AuditLog, Dashboard, DuplicateVisitGroup, FinanceSummary, FinancialTransaction, LoginResponse, PageResponse, SocialAssistanceRecord, SocialAssistanceSummary, Team, TeamDetail, Territory, UserSummary, UserTeamHistory, Visit } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -120,6 +120,29 @@ export class ApiService {
 
   exportSocialAssistance(params: Record<string, string | number | undefined> = {}) {
     return this.http.get(`${environment.apiBaseUrl}/social-assistance/export.xlsx`, {
+      params: this.params(params),
+      responseType: 'blob'
+    });
+  }
+
+  financialTransactions(params: Record<string, string | number | undefined>) {
+    return this.http.get<PageResponse<FinancialTransaction>>(`${environment.apiBaseUrl}/finance`, { params: this.params(params) });
+  }
+
+  financeSummary(params: Record<string, string | number | undefined>) {
+    return this.http.get<FinanceSummary>(`${environment.apiBaseUrl}/finance/summary`, { params: this.params(params) });
+  }
+
+  createFinancialTransaction(transaction: FinancialTransaction) {
+    return this.http.post<FinancialTransaction>(`${environment.apiBaseUrl}/finance`, transaction);
+  }
+
+  updateFinancialTransaction(transaction: FinancialTransaction) {
+    return this.http.put<FinancialTransaction>(`${environment.apiBaseUrl}/finance/${transaction.id}`, transaction);
+  }
+
+  exportFinance(params: Record<string, string | number | undefined> = {}) {
+    return this.http.get(`${environment.apiBaseUrl}/finance/export.xlsx`, {
       params: this.params(params),
       responseType: 'blob'
     });

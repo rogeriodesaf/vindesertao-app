@@ -1,0 +1,259 @@
+package org.vindesertao.finance;
+
+import io.quarkus.panache.common.Page;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
+import jakarta.validation.Valid;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.vindesertao.common.PageResponse;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
+@Path("/finance")
+@Consumes(MediaType.APPLICATION_JSON)
+@Produces(MediaType.APPLICATION_JSON)
+@RolesAllowed({"admin", "lider", "projetista"})
+public class FinanceResource {
+    private static final String XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    private static final DateTimeFormatter BRAZIL_DATE_TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final DateTimeFormatter BRAZIL_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+    @Inject
+    FinanceService service;
+
+    @GET
+    public PageResponse<FinanceDtos.FinancialTransactionResponse> list(@QueryParam("page") @DefaultValue("0") int page,
+                                                                       @QueryParam("size") @DefaultValue("20") int size,
+                                                                       @QueryParam("type") FinancialTransactionType type,
+                                                                       @QueryParam("category") String category,
+                                                                       @QueryParam("paymentMethod") String paymentMethod,
+                                                                       @QueryParam("from") String from,
+                                                                       @QueryParam("to") String to) {
+        var query = service.filtered(type, category, paymentMethod, parseDate(from), parseDate(to));
+        long total = query.count();
+        var items = query.page(Page.of(page, size)).list().stream()
+                .map(FinanceDtos.FinancialTransactionResponse::from)
+                .toList();
+        int pages = (int) Math.ceil(total / (double) size);
+        return new PageResponse<>(items, total, page, size, pages);
+    }
+
+    @GET
+    @Path("/summary")
+    public FinanceDtos.FinanceSummary summary(@QueryParam("type") FinancialTransactionType type,
+                                              @QueryParam("category") String category,
+                                              @QueryParam("paymentMethod") String paymentMethod,
+                                              @QueryParam("from") String from,
+                                              @QueryParam("to") String to) {
+        return service.summary(type, category, paymentMethod, parseDate(from), parseDate(to));
+    }
+
+    @POST
+    public FinanceDtos.FinancialTransactionResponse create(@Valid FinanceDtos.FinancialTransactionRequest request) {
+        return FinanceDtos.FinancialTransactionResponse.from(service.create(request));
+    }
+
+    @PUT
+    @Path("/{id}")
+    public FinanceDtos.FinancialTransactionResponse update(@PathParam("id") Long id,
+                                                           @Valid FinanceDtos.FinancialTransactionRequest request) {
+        return FinanceDtos.FinancialTransactionResponse.from(service.update(id, request));
+    }
+
+    @GET
+    @Path("/export.xlsx")
+    @Produces(XLSX_MEDIA_TYPE)
+    public Response exportXlsx(@QueryParam("type") FinancialTransactionType type,
+                               @QueryParam("category") String category,
+                               @QueryParam("paymentMethod") String paymentMethod,
+                               @QueryParam("from") String from,
+                               @QueryParam("to") String to) {
+        var rows = service.filtered(type, category, paymentMethod, parseDate(from), parseDate(to)).list();
+        return Response.ok(workbook(rows))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=relatorio-financeiro.xlsx")
+                .build();
+    }
+
+    private LocalDate parseDate(String value) {
+        return value == null || value.isBlank() ? null : LocalDate.parse(value);
+    }
+
+    private byte[] workbook(List<FinancialTransaction> transactions) {
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            try (ZipOutputStream zip = new ZipOutputStream(out, StandardCharsets.UTF_8)) {
+                writeEntry(zip, "[Content_Types].xml", """
+                        <?xml version="1.0" encoding="UTF-8"?>
+                        <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+                          <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+                          <Default Extension="xml" ContentType="application/xml"/>
+                          <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+                          <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+                          <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+                        </Types>
+                        """);
+                writeEntry(zip, "_rels/.rels", """
+                        <?xml version="1.0" encoding="UTF-8"?>
+                        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                          <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+                        </Relationships>
+                        """);
+                writeEntry(zip, "xl/workbook.xml", """
+                        <?xml version="1.0" encoding="UTF-8"?>
+                        <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+                          <sheets><sheet name="Financeiro" sheetId="1" r:id="rId1"/></sheets>
+                        </workbook>
+                        """);
+                writeEntry(zip, "xl/_rels/workbook.xml.rels", """
+                        <?xml version="1.0" encoding="UTF-8"?>
+                        <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                          <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+                          <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+                        </Relationships>
+                        """);
+                writeEntry(zip, "xl/styles.xml", stylesXml());
+                writeEntry(zip, "xl/worksheets/sheet1.xml", sheetXml(transactions));
+            }
+            return out.toByteArray();
+        } catch (IOException exception) {
+            throw new IllegalStateException("Nao foi possivel gerar o arquivo Excel.", exception);
+        }
+    }
+
+    private String sheetXml(List<FinancialTransaction> transactions) {
+        List<List<String>> rows = new ArrayList<>();
+        rows.add(Arrays.asList("Data", "Tipo", "Categoria", "Descricao", "Valor", "Forma de pagamento", "Responsavel", "Observacoes"));
+        transactions.forEach(transaction -> rows.add(Arrays.asList(
+                formatDate(transaction.transactionDate),
+                FinanceService.typeLabel(transaction.type),
+                text(transaction.category),
+                text(transaction.description),
+                money(transaction.type == FinancialTransactionType.EXPENSE ? transaction.amount.negate() : transaction.amount),
+                text(transaction.paymentMethod),
+                transaction.responsibleUser == null ? "" : text(transaction.responsibleUser.name),
+                text(transaction.notes)
+        )));
+
+        String lastColumn = columnName(rows.get(0).size());
+        StringBuilder xml = new StringBuilder("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+                  <sheetViews><sheetView workbookViewId="0"><pane ySplit="3" topLeftCell="A4" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
+                  <sheetFormatPr defaultRowHeight="18"/>
+                  <cols>
+                    <col min="1" max="1" width="14" customWidth="1"/>
+                    <col min="2" max="3" width="18" customWidth="1"/>
+                    <col min="4" max="4" width="34" customWidth="1"/>
+                    <col min="5" max="5" width="16" customWidth="1"/>
+                    <col min="6" max="8" width="24" customWidth="1"/>
+                  </cols>
+                  <sheetData>
+                    <row r="1"><c r="A1" s="1" t="inlineStr"><is><t>Relatorio financeiro</t></is></c></row>
+                    <row r="2"><c r="A2" s="2" t="inlineStr"><is><t>Gerado em %s | Total de lancamentos: %s</t></is></c></row>
+                """.formatted(OffsetDateTime.now().format(BRAZIL_DATE_TIME), transactions.size()));
+        for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
+            int excelRow = rowIndex + 3;
+            xml.append("<row r=\"").append(excelRow).append("\">");
+            List<String> row = rows.get(rowIndex);
+            for (int columnIndex = 0; columnIndex < row.size(); columnIndex++) {
+                String cell = columnName(columnIndex + 1) + excelRow;
+                int style = rowIndex == 0 ? 3 : 4;
+                xml.append("<c r=\"").append(cell).append("\" s=\"").append(style).append("\" t=\"inlineStr\"><is><t xml:space=\"preserve\">")
+                        .append(xml(row.get(columnIndex)))
+                        .append("</t></is></c>");
+            }
+            xml.append("</row>");
+        }
+        xml.append("""
+                  </sheetData>
+                  <autoFilter ref="A3:%s%s"/>
+                  <mergeCells count="1"><mergeCell ref="A1:%s1"/></mergeCells>
+                </worksheet>
+                """.formatted(lastColumn, rows.size() + 2, lastColumn));
+        return xml.toString();
+    }
+
+    private String stylesXml() {
+        return """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+                  <fonts count="4">
+                    <font><sz val="11"/><color rgb="FF1D2A24"/><name val="Calibri"/></font>
+                    <font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
+                    <font><i/><sz val="10"/><color rgb="FF607168"/><name val="Calibri"/></font>
+                    <font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
+                  </fonts>
+                  <fills count="4">
+                    <fill><patternFill patternType="none"/></fill>
+                    <fill><patternFill patternType="gray125"/></fill>
+                    <fill><patternFill patternType="solid"><fgColor rgb="FF276749"/><bgColor indexed="64"/></patternFill></fill>
+                    <fill><patternFill patternType="solid"><fgColor rgb="FFEAF3EC"/><bgColor indexed="64"/></patternFill></fill>
+                  </fills>
+                  <borders count="2">
+                    <border><left/><right/><top/><bottom/><diagonal/></border>
+                    <border><left style="thin"><color rgb="FFD9E2DD"/></left><right style="thin"><color rgb="FFD9E2DD"/></right><top style="thin"><color rgb="FFD9E2DD"/></top><bottom style="thin"><color rgb="FFD9E2DD"/></bottom><diagonal/></border>
+                  </borders>
+                  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+                  <cellXfs count="5">
+                    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+                    <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center"/></xf>
+                    <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+                    <xf numFmtId="0" fontId="3" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" wrapText="1"/></xf>
+                    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"><alignment vertical="center"/></xf>
+                  </cellXfs>
+                  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+                </styleSheet>
+                """;
+    }
+
+    private void writeEntry(ZipOutputStream zip, String name, String content) throws IOException {
+        zip.putNextEntry(new ZipEntry(name));
+        zip.write(content.getBytes(StandardCharsets.UTF_8));
+        zip.closeEntry();
+    }
+
+    private String columnName(int index) {
+        StringBuilder name = new StringBuilder();
+        while (index > 0) {
+            index--;
+            name.insert(0, (char) ('A' + (index % 26)));
+            index /= 26;
+        }
+        return name.toString();
+    }
+
+    private String text(Object value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private String money(BigDecimal value) {
+        return value == null ? "0.00" : value.setScale(2).toPlainString();
+    }
+
+    private String formatDate(LocalDate value) {
+        return value == null ? "" : value.format(BRAZIL_DATE);
+    }
+
+    private String xml(String value) {
+        return value == null ? "" : value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&apos;");
+    }
+}

@@ -9,6 +9,7 @@ export interface UserPrincipal {
   mustChangePassword: boolean;
   canRegisterVisits: boolean;
   canViewReports: boolean;
+  canAccessFinance: boolean;
 }
 
 export interface LoginResponse {
@@ -94,6 +95,7 @@ export interface AppUser {
   mustChangePassword?: boolean;
   canRegisterVisits: boolean;
   canViewReports: boolean;
+  canAccessFinance: boolean;
 }
 
 export type TeamType = 'EVANGELISM' | 'SUPPORT' | 'SOCIAL_ACTION' | 'CHILDREN' | 'KITCHEN' | 'MUSIC' | 'INTERCESSION' | 'MEDIA' | 'SECRETARIAT' | 'FINANCE' | 'OTHER';
@@ -196,4 +198,31 @@ export interface SocialAssistanceSummary {
   byResponsible: CountItem[];
   byNeighborhood: CountItem[];
   byPeriod: CountItem[];
+}
+
+export type FinancialTransactionType = 'INCOME' | 'EXPENSE';
+
+export interface FinancialTransaction {
+  id?: number;
+  type: FinancialTransactionType;
+  typeLabel?: string;
+  category: string;
+  description: string;
+  amount: number;
+  paymentMethod?: string;
+  transactionDate: string;
+  notes?: string;
+  responsibleUserId?: number;
+  responsibleUserName?: string;
+  createdAt?: string;
+}
+
+export interface FinanceSummary {
+  totalIncome: number;
+  totalExpense: number;
+  balance: number;
+  totalTransactions: number;
+  byCategory: Array<{ label: string; total: number }>;
+  byPaymentMethod: Array<{ label: string; total: number }>;
+  byPeriod: Array<{ label: string; total: number }>;
 }

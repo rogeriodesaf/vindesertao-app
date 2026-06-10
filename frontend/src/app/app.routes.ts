@@ -10,6 +10,7 @@ import { TerritoriesComponent } from './territories/territories.component';
 import { UsersComponent } from './users/users.component';
 import { VisitsComponent } from './visits/visits.component';
 import { SocialAssistanceComponent } from './social-assistance/social-assistance.component';
+import { FinanceComponent } from './finance/finance.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -17,6 +18,7 @@ export const routes: Routes = [
   { path: 'visits', component: VisitsComponent, canActivate: [authGuard] },
   { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard], data: { canViewReports: true } },
   { path: 'social-assistance', component: SocialAssistanceComponent, canActivate: [authGuard], data: { roles: ['admin', 'lider', 'projetista'] } },
+  { path: 'finance', component: FinanceComponent, canActivate: [authGuard], data: { canAccessFinance: true } },
   { path: 'teams', component: TeamsComponent, canActivate: [authGuard], data: { roles: ['admin', 'lider', 'projetista'] } },
   { path: 'users', component: UsersComponent, canActivate: [authGuard], data: { roles: ['admin'] } },
   { path: 'territories', component: TerritoriesComponent, canActivate: [authGuard], data: { roles: ['admin'] } },

@@ -16,7 +16,8 @@ public record LoginResponse(
             Long teamId,
             boolean mustChangePassword,
             boolean canRegisterVisits,
-            boolean canViewReports
+            boolean canViewReports,
+            boolean canAccessFinance
     ) {
     }
 }

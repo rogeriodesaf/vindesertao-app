@@ -142,6 +142,9 @@ export class AuditComponent implements OnInit {
     if (log.entityType === 'SOCIAL_ASSISTANCE') {
       return `Atendimento de ${data['assistedPersonName'] || 'pessoa nao informada'}, tipo ${data['serviceType'] || 'nao informado'}, quantidade ${data['quantity'] || 1}, equipe ${data['team'] || 'sem equipe'}.`;
     }
+    if (log.entityType === 'FINANCE') {
+      return `${data['type'] || 'Lancamento'} de ${data['amount'] || 'valor nao informado'} em ${data['category'] || 'categoria nao informada'}, responsavel ${data['responsible'] || 'nao informado'}.`;
+    }
     return 'Registro administrativo atualizado.';
   }
 
@@ -160,7 +163,8 @@ export class AuditComponent implements OnInit {
       TEAM: 'Equipe',
       VISIT: 'Ficha de visita',
       TERRITORY: 'Territorio',
-      SOCIAL_ASSISTANCE: 'Atendimento social'
+      SOCIAL_ASSISTANCE: 'Atendimento social',
+      FINANCE: 'Lancamento financeiro'
     };
     return labels[entity] || entity;
   }

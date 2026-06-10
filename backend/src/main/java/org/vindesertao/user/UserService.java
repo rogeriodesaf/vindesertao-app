@@ -55,6 +55,7 @@ public class UserService {
         user.active = request.active();
         user.canRegisterVisits = request.canRegisterVisits();
         user.canViewReports = request.canViewReports();
+        user.canAccessFinance = request.canAccessFinance();
         user.mustChangePassword = true;
         user.createdAt = OffsetDateTime.now();
         users.persist(user);
@@ -76,6 +77,7 @@ public class UserService {
         user.active = request.active();
         user.canRegisterVisits = request.canRegisterVisits();
         user.canViewReports = request.canViewReports();
+        user.canAccessFinance = request.canAccessFinance();
         user.updatedAt = OffsetDateTime.now();
         if (request.password() != null && !request.password().isBlank()) {
             if (request.password().length() < 8) {
@@ -119,7 +121,10 @@ public class UserService {
             if (user.canViewReports) {
                 byAccess.merge("Podem ver relatorios", 1L, Long::sum);
             }
-            if (!user.canRegisterVisits && !user.canViewReports) {
+            if (user.canAccessFinance) {
+                byAccess.merge("Podem acessar financeiro", 1L, Long::sum);
+            }
+            if (!user.canRegisterVisits && !user.canViewReports && !user.canAccessFinance) {
                 byAccess.merge("Apoio sem acesso operacional", 1L, Long::sum);
             }
         });
@@ -183,7 +188,8 @@ public class UserService {
                 + safe(user.roles) + "\",\"team\":\"" + safe(user.team == null ? null : user.team.name)
                 + "\",\"additionalTeams\":\"" + safe(String.join(", ", extraTeams))
                 + "\",\"active\":" + user.active + ",\"canRegisterVisits\":" + user.canRegisterVisits
-                + ",\"canViewReports\":" + user.canViewReports + ",\"mustChangePassword\":" + user.mustChangePassword + "}";
+                + ",\"canViewReports\":" + user.canViewReports + ",\"canAccessFinance\":" + user.canAccessFinance
+                + ",\"mustChangePassword\":" + user.mustChangePassword + "}";
     }
 
     private List<UserDtos.UserSummaryItem> items(Map<String, Long> map) {
