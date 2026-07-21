@@ -26,6 +26,14 @@ export class AuthService {
     );
   }
 
+  forgotPassword(email: string) {
+    return this.http.post<{ message: string }>(`${environment.apiBaseUrl}/auth/forgot-password`, { email: email.trim() });
+  }
+
+  resetPassword(token: string, newPassword: string, confirmPassword: string) {
+    return this.http.post<{ message: string }>(`${environment.apiBaseUrl}/auth/reset-password`, { token, newPassword, confirmPassword });
+  }
+
   logout(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);

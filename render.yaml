@@ -26,6 +26,24 @@ services:
         sync: false
       - key: CLOUDINARY_FOLDER
         value: vinde-sertao/visitas
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_MOCK
+        value: "false"
+      - key: SMTP_START_TLS
+        value: REQUIRED
+      - key: FRONTEND_URL
+        value: https://vindesertao-app.onrender.com
+      - key: RESET_PASSWORD_EXPIRATION_MINUTES
+        value: "30"
 
   - type: web
     name: vindesertao-app

@@ -4,6 +4,7 @@ import { SlicePipe } from '@angular/common';
 import { AfterViewInit, Component, NgZone, OnDestroy, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import * as L from 'leaflet';
+import { finalize } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { formatDateTime } from '../core/date-format';
@@ -16,14 +17,21 @@ import { OfflineVisitQueueService } from '../core/offline-visit-queue.service';
   standalone: true,
   imports: [FormsModule, SlicePipe],
   template: `
-    <section class="workspace">
+    <div class="mobile-view-toggle" role="group" aria-label="Visualização da tela de visitas">
+      <button type="button" [class.active]="mobileView() === 'form'" (click)="showMobileView('form')">Cadastro</button>
+      <button type="button" [class.active]="mobileView() === 'map'" (click)="showMobileView('map')">Mapa</button>
+    </div>
+    <section class="workspace" [class.mobile-map-view]="mobileView() === 'map'">
       <div class="map-panel">
         <div class="map-toolbar">
-          <input placeholder="Buscar endereco" [(ngModel)]="searchText" (keyup.enter)="searchAddress()">
-          <button type="button" (click)="searchAddress()">Buscar</button>
-          <button type="button" class="secondary" (click)="downloadExcel()">Excel</button>
+          <input placeholder="Buscar endereço" [(ngModel)]="searchText" (keyup.enter)="searchAddress()">
+          <button type="button" [disabled]="searchingAddress()" (click)="searchAddress()">{{ searchingAddress() ? 'Buscando...' : 'Buscar' }}</button>
+          <button type="button" class="secondary" [disabled]="exporting()" (click)="downloadExcel()">{{ exporting() ? 'Gerando...' : 'Excel' }}</button>
         </div>
         <div id="visit-map" class="map"></div>
+        @if (territoryStatus()) {
+          <div class="territory-status" [class.outside]="territoryOutside()">{{ territoryStatus() }}</div>
+        }
       </div>
 
       <aside class="side-panel">
@@ -34,57 +42,105 @@ import { OfflineVisitQueueService } from '../core/offline-visit-queue.service';
               <span>{{ offlineStatusText() }}</span>
             </div>
             @if (offlineQueue.pendingCount() > 0) {
-              <button type="button" class="secondary" (click)="syncOfflineVisits()">Sincronizar agora</button>
+              <div class="offline-actions">
+                <button type="button" class="secondary" [disabled]="offlineQueue.syncing()" (click)="syncOfflineVisits()">
+                  {{ offlineQueue.syncing() ? 'Sincronizando...' : 'Sincronizar agora' }}
+                </button>
+                <button type="button" class="secondary" (click)="pendingOpen.set(!pendingOpen())">
+                  {{ pendingOpen() ? 'Ocultar pendências' : 'Ver pendências' }}
+                </button>
+              </div>
             }
           </section>
+          @if (pendingOpen() && offlineQueue.pendingItems().length) {
+            <section class="pending-list" aria-label="Fichas pendentes">
+              @for (pending of offlineQueue.pendingItems(); track pending.id) {
+                <article>
+                  <div>
+                    <strong>{{ pending.visit.personName || 'Sem identificação' }}</strong>
+                    <span>{{ formatDate(pending.createdAt) }}</span>
+                    <small>Tentativas: {{ pending.attempts }}</small>
+                    @if (pending.lastError) { <small class="error">Último erro: {{ pending.lastError }}</small> }
+                  </div>
+                  @if (pending.id) {
+                    <button type="button" class="secondary" (click)="removePending(pending.id, pending.visit.personName)">Excluir</button>
+                  }
+                </article>
+              }
+            </section>
+          }
         }
 
         @if (canManageVisits()) {
           <h2>{{ editingId() ? 'Editar visita' : 'Nova visita' }}</h2>
           <form #visitForm="ngForm" novalidate (ngSubmit)="save(visitForm)">
             <label>Nome da pessoa<input name="personName" [(ngModel)]="form.personName" required></label>
-            <label>Telefone<input name="phone" [(ngModel)]="form.phone"></label>
-            <div class="form-grid">
-              <label>Rua<input name="street" [(ngModel)]="form.street"></label>
-              <label>Numero<input name="number" [(ngModel)]="form.number"></label>
-            </div>
-            <div class="form-grid">
-              <label>Bairro<input name="neighborhood" [(ngModel)]="form.neighborhood"></label>
-              <label>Cidade<input name="city" [(ngModel)]="form.city" required></label>
-            </div>
-            <label>Endereco manual<textarea name="manualAddress" [(ngModel)]="form.manualAddress"></textarea></label>
-            <div class="form-grid">
-              <label>Idade<input name="personAge" type="number" min="0" [(ngModel)]="form.personAge"></label>
-              <label>Moradores na casa<input name="householdSize" type="number" min="0" [(ngModel)]="form.householdSize"></label>
-            </div>
-            <div class="form-grid">
-              <label>Latitude<input name="latitude" type="number" step="any" [(ngModel)]="form.latitude"></label>
-              <label>Longitude<input name="longitude" type="number" step="any" [(ngModel)]="form.longitude"></label>
-            </div>
+            <label>Telefone<input name="phone" type="tel" inputmode="tel" [(ngModel)]="form.phone"></label>
             <label class="check-row">
               <input name="wantsVisits" type="checkbox" [(ngModel)]="form.wantsVisits">
               Deseja receber visitas?
             </label>
-            <label>Ponto de referencia<textarea name="referencePoint" [(ngModel)]="form.referencePoint"></textarea></label>
-            <label>Pedido de oracao<textarea name="prayerRequest" [(ngModel)]="form.prayerRequest"></textarea></label>
-            <label>Proxima visita<input name="nextVisitAt" type="datetime-local" [ngModel]="toLocalDateTime(form.nextVisitAt)" (ngModelChange)="setNextVisitAt($event)"></label>
-            <label>Link do Street View<input name="streetViewUrl" type="url" placeholder="Cole aqui o link do Google Street View" [(ngModel)]="form.streetViewUrl"></label>
-            <label>Observacoes<textarea name="notes" [(ngModel)]="form.notes"></textarea></label>
+            <label>Pedido de oração<textarea name="prayerRequest" [(ngModel)]="form.prayerRequest"></textarea></label>
+            <label>Observações<textarea name="notes" [(ngModel)]="form.notes"></textarea></label>
+
+            <section class="location-card">
+              <div>
+                <strong>Localização</strong>
+                <span>{{ geolocationMessage() || 'Use o GPS ou marque o ponto diretamente no mapa.' }}</span>
+              </div>
+              <button type="button" class="secondary" [disabled]="geolocationState() === 'loading'" (click)="useMyLocation()">
+                {{ geolocationState() === 'loading' ? 'Buscando localização...' : 'Usar minha localização' }}
+              </button>
+              <div class="form-grid coordinates">
+                <label>Latitude<input name="latitude" type="number" step="any" [(ngModel)]="form.latitude" (ngModelChange)="manualCoordinatesChanged()"></label>
+                <label>Longitude<input name="longitude" type="number" step="any" [(ngModel)]="form.longitude" (ngModelChange)="manualCoordinatesChanged()"></label>
+              </div>
+              <button type="button" class="secondary mobile-only-action" (click)="showMobileView('map')">Abrir mapa para ajustar</button>
+              @if (territoryStatus()) {
+                <small [class.error]="territoryOutside()">{{ territoryStatus() }}</small>
+              }
+            </section>
+
             <div class="photo-field">
-              <label>Foto da casa
-                <input type="file" accept="image/*" capture="environment" (change)="attachPhoto($event)">
-              </label>
+              <strong>Foto da casa</strong>
+              <div class="photo-actions">
+                <label class="button">Abrir câmera<input class="visually-hidden" type="file" accept="image/*" capture="environment" (change)="attachPhoto($event)"></label>
+                <label class="button secondary">Escolher da galeria<input class="visually-hidden" type="file" accept="image/*" (change)="attachPhoto($event)"></label>
+              </div>
               @if (photoPreview()) {
                 <div class="photo-preview">
-                  <img [src]="photoPreview()" alt="Foto anexada a ficha">
+                  <img [src]="photoPreview()" alt="Foto anexada à ficha">
                   <div>
                     <strong>{{ form.photoFileName || 'Foto anexada' }}</strong>
-                    <small>Esta foto sera salva junto com a ficha da casa.</small>
+                    <small>Esta foto será salva junto com a ficha da casa.</small>
                     <button type="button" class="secondary" (click)="removePhoto()">Remover foto</button>
                   </div>
                 </div>
               }
             </div>
+
+            <details class="more-fields">
+              <summary>Mais informações</summary>
+              <div class="more-fields-content">
+                <div class="form-grid">
+                  <label>Rua<input name="street" [(ngModel)]="form.street"></label>
+                  <label>Número<input name="number" [(ngModel)]="form.number"></label>
+                </div>
+                <div class="form-grid">
+                  <label>Bairro<input name="neighborhood" [(ngModel)]="form.neighborhood"></label>
+                  <label>Cidade<input name="city" [(ngModel)]="form.city" required></label>
+                </div>
+                <label>Endereço manual<textarea name="manualAddress" [(ngModel)]="form.manualAddress"></textarea></label>
+                <div class="form-grid">
+                  <label>Idade<input name="personAge" type="number" min="0" [(ngModel)]="form.personAge"></label>
+                  <label>Moradores na casa<input name="householdSize" type="number" min="0" [(ngModel)]="form.householdSize"></label>
+                </div>
+                <label>Ponto de referência<textarea name="referencePoint" [(ngModel)]="form.referencePoint"></textarea></label>
+                <label>Próxima visita<input name="nextVisitAt" type="datetime-local" [ngModel]="toLocalDateTime(form.nextVisitAt)" (ngModelChange)="setNextVisitAt($event)"></label>
+                <label>Link do Street View<input name="streetViewUrl" type="url" placeholder="Cole aqui o link do Google Street View" [(ngModel)]="form.streetViewUrl"></label>
+                <button type="button" class="secondary" [disabled]="!hasStreetViewTarget()" (click)="openStreetView()">Ver no Street View</button>
+              </div>
+            </details>
             @if (message()) {
               <p class="success">{{ message() }}</p>
             }
@@ -92,11 +148,8 @@ import { OfflineVisitQueueService } from '../core/offline-visit-queue.service';
               <p class="error">{{ error() }}</p>
             }
             <div class="actions">
-              <button type="submit">Salvar</button>
-              <button type="button" class="secondary" (click)="resetForm()">Limpar</button>
-              <button type="button" class="secondary" [disabled]="!hasStreetViewTarget()" (click)="openStreetView()">
-                Ver no Street View
-              </button>
+              <button type="submit" class="save-visit" [disabled]="saving()">{{ saving() ? 'Salvando...' : 'Salvar visita' }}</button>
+              <button type="button" class="secondary" [disabled]="saving()" (click)="resetForm()">Limpar</button>
             </div>
           </form>
         } @else {
@@ -114,10 +167,10 @@ import { OfflineVisitQueueService } from '../core/offline-visit-queue.service';
             <select [(ngModel)]="filters.wantsVisits" (change)="loadVisits()">
               <option value="">Todas</option>
               <option value="true">Aceita</option>
-              <option value="false">Nao aceita</option>
+              <option value="false">Não aceita</option>
             </select>
           </div>
-          <button type="button" class="secondary full" (click)="loadVisits()">Filtrar</button>
+          <button type="button" class="secondary full" [disabled]="loadingVisits()" (click)="loadVisits()">{{ loadingVisits() ? 'Carregando...' : 'Filtrar' }}</button>
         </div>
 
         <div class="visit-list">
@@ -126,7 +179,7 @@ import { OfflineVisitQueueService } from '../core/offline-visit-queue.service';
               <strong>{{ visit.personName }}</strong>
               <span>{{ visit.neighborhood || visit.manualAddress || visit.city }}</span>
               @if (showResponsibleName()) {
-                <small>{{ visit.responsibleUserName || 'Responsavel nao informado' }}</small>
+                <small>{{ visit.responsibleUserName || 'Responsável não informado' }}</small>
               }
               @if (visit.hasPhoto) {
                 <small>Foto anexada</small>
@@ -148,6 +201,17 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   message = signal('');
   error = signal('');
   online = signal(typeof navigator === 'undefined' ? true : navigator.onLine);
+  saving = signal(false);
+  loadingVisits = signal(false);
+  loadingTerritories = signal(false);
+  searchingAddress = signal(false);
+  exporting = signal(false);
+  pendingOpen = signal(false);
+  mobileView = signal<'form' | 'map'>('form');
+  geolocationState = signal<'idle' | 'loading' | 'success' | 'denied' | 'unavailable' | 'timeout'>('idle');
+  geolocationMessage = signal('');
+  territoryStatus = signal('');
+  territoryOutside = signal(false);
   searchText = '';
   private map?: L.Map;
   private marker?: L.Marker;
@@ -155,6 +219,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   private territoryLayer = L.layerGroup();
   private refreshHandle?: ReturnType<typeof setInterval>;
   private fittedInitialContent = false;
+  private mapTileWarningShown = false;
 
   constructor(public api: ApiService, private http: HttpClient, private auth: AuthService, private zone: NgZone, private notifications: NotificationService, public offlineQueue: OfflineVisitQueueService) {}
 
@@ -164,6 +229,11 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap'
+    }).on('tileerror', () => {
+      if (!this.mapTileWarningShown) {
+        this.mapTileWarningShown = true;
+        this.notifications.info('O mapa não pôde carregar completamente. O formulário continua disponível.');
+      }
     }).addTo(this.map);
     this.territoryLayer.addTo(this.map);
     this.visitLayer.addTo(this.map);
@@ -192,19 +262,35 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   }
 
   loadVisits(): void {
+    if (this.loadingVisits()) {
+      return;
+    }
+    this.loadingVisits.set(true);
     this.api.visits({ page: 0, size: 100, neighborhood: this.filters.neighborhood, wantsVisits: this.filters.wantsVisits || undefined })
-      .subscribe((page) => {
-        this.visits.set(page.items);
-        this.renderMarkers(page.items);
-        this.fitInitialContent();
+      .pipe(finalize(() => this.loadingVisits.set(false)))
+      .subscribe({
+        next: (page) => {
+          this.visits.set(page.items);
+          this.renderMarkers(page.items);
+          this.fitInitialContent();
+        },
+        error: () => this.fail('Não foi possível carregar as visitas. O formulário continua disponível.')
       });
   }
 
   loadTerritories(): void {
-    this.api.territories().subscribe((territories) => {
-      this.territories.set(territories);
-      this.renderTerritories();
-      this.fitInitialContent();
+    if (this.loadingTerritories()) {
+      return;
+    }
+    this.loadingTerritories.set(true);
+    this.api.territories().pipe(finalize(() => this.loadingTerritories.set(false))).subscribe({
+      next: (territories) => {
+        this.territories.set(territories);
+        this.renderTerritories();
+        this.updateTerritoryStatus();
+        this.fitInitialContent();
+      },
+      error: () => this.notifications.error('Não foi possível carregar os territórios. Tente novamente mais tarde.')
     });
   }
 
@@ -212,43 +298,61 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     if (!this.searchText.trim()) {
       return;
     }
+    if (this.searchingAddress()) {
+      return;
+    }
+    this.searchingAddress.set(true);
     const url = 'https://nominatim.openstreetmap.org/search';
     this.http.get<Array<{ lat: string; lon: string; display_name: string }>>(url, {
       params: { q: this.searchText, format: 'json', limit: 1, addressdetails: 1 }
-    }).subscribe((results) => {
-      const first = results[0];
-      if (!first) {
-        if (this.canManageVisits()) {
-          this.form.manualAddress = this.searchText;
+    }).pipe(finalize(() => this.searchingAddress.set(false))).subscribe({
+      next: (results) => {
+        const first = results[0];
+        if (!first) {
+          if (this.canManageVisits()) {
+            this.form.manualAddress = this.searchText;
+          }
+          this.message.set(this.canManageVisits()
+            ? 'Endereço não encontrado. Preencha manualmente e salve.'
+            : 'Endereço não encontrado.');
+          this.notifications.info(this.message());
+          return;
         }
-        this.message.set(this.canManageVisits()
-          ? 'Endereco nao encontrado. Preencha manualmente e salve.'
-          : 'Endereco nao encontrado.');
-        this.notifications.info(this.message());
-        return;
-      }
-      if (this.canManageVisits()) {
-        this.form.manualAddress = first.display_name;
-        this.selectPoint(Number(first.lat), Number(first.lon));
-      }
-      this.map?.setView([Number(first.lat), Number(first.lon)], 17);
+        if (this.canManageVisits()) {
+          this.form.manualAddress = first.display_name;
+          this.selectPoint(Number(first.lat), Number(first.lon));
+        }
+        this.map?.setView([Number(first.lat), Number(first.lon)], 17);
+      },
+      error: () => this.fail('A busca de endereço falhou. Você pode preencher o endereço ou marcar o ponto manualmente.')
     });
   }
 
   save(form: NgForm): void {
+    if (this.saving()) {
+      return;
+    }
     this.message.set('');
     this.error.set('');
     if (form.invalid) {
+      const details = document.querySelector<HTMLDetailsElement>('.more-fields');
+      if (details) details.open = true;
       this.fail('Preencha os campos obrigatórios antes de salvar.');
       return;
     }
     const payload = { ...this.form };
     const editing = !!this.editingId();
+    this.saving.set(true);
+    if (!editing && typeof navigator !== 'undefined' && !navigator.onLine) {
+      this.enqueueOffline(payload);
+      return;
+    }
     const action = this.editingId()
       ? this.api.updateVisit(this.editingId() as number, payload)
       : this.api.createVisit(payload);
     action.subscribe({
       next: () => {
+        this.saving.set(false);
         this.ok(editing ? 'Ficha de visita atualizada com sucesso.' : 'Ficha de visita salva com sucesso.');
         this.resetForm();
         this.loadVisits();
@@ -284,11 +388,75 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   }
 
   resetForm(): void {
+    if (this.saving()) {
+      return;
+    }
     this.form = this.blankVisit();
     this.editingId.set(null);
     this.error.set('');
     this.marker?.remove();
     this.marker = undefined;
+    this.geolocationState.set('idle');
+    this.geolocationMessage.set('');
+    this.territoryStatus.set('');
+    this.territoryOutside.set(false);
+  }
+
+  showMobileView(view: 'form' | 'map'): void {
+    this.mobileView.set(view);
+    if (view === 'map') {
+      window.setTimeout(() => {
+        this.map?.invalidateSize();
+        document.querySelector('.mobile-view-toggle')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 0);
+    }
+  }
+
+  useMyLocation(): void {
+    if (!navigator.geolocation) {
+      this.geolocationState.set('unavailable');
+      this.geolocationMessage.set('Localização indisponível neste aparelho ou navegador.');
+      return;
+    }
+    this.geolocationState.set('loading');
+    this.geolocationMessage.set('Buscando localização...');
+    navigator.geolocation.getCurrentPosition(
+      (position) => this.zone.run(() => {
+        const { latitude, longitude } = position.coords;
+        this.setPoint(latitude, longitude);
+        this.map?.setView([latitude, longitude], 18);
+        this.geolocationState.set('success');
+        this.geolocationMessage.set('Localização encontrada. Você ainda pode ajustar o ponto no mapa.');
+        this.ok('Localização encontrada e adicionada à ficha.');
+      }),
+      (geoError) => this.zone.run(() => {
+        if (geoError.code === geoError.PERMISSION_DENIED) {
+          this.geolocationState.set('denied');
+          this.geolocationMessage.set('Permissão de localização negada. Marque o ponto manualmente no mapa.');
+        } else if (geoError.code === geoError.TIMEOUT) {
+          this.geolocationState.set('timeout');
+          this.geolocationMessage.set('A busca de localização demorou demais. Tente novamente ou use o mapa.');
+        } else {
+          this.geolocationState.set('unavailable');
+          this.geolocationMessage.set('Não foi possível obter a localização. Marque o ponto manualmente no mapa.');
+        }
+        this.notifications.error(this.geolocationMessage());
+      }),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+    );
+  }
+
+  manualCoordinatesChanged(): void {
+    if (this.form.latitude == null || this.form.longitude == null) {
+      this.territoryStatus.set('');
+      this.territoryOutside.set(false);
+      return;
+    }
+    const latitude = Number(this.form.latitude);
+    const longitude = Number(this.form.longitude);
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      this.setPoint(latitude, longitude);
+    }
   }
 
   hasSelectedPoint(): boolean {
@@ -312,13 +480,20 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   }
 
   downloadExcel(): void {
-    this.api.exportVisits().subscribe((blob) => {
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `minhas-visitas-${new Date().toISOString().slice(0, 10)}.xlsx`;
-      link.click();
-      URL.revokeObjectURL(url);
+    if (this.exporting()) {
+      return;
+    }
+    this.exporting.set(true);
+    this.api.exportVisits().pipe(finalize(() => this.exporting.set(false))).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `minhas-visitas-${new Date().toISOString().slice(0, 10)}.xlsx`;
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+      error: () => this.fail('Não foi possível gerar a exportação. Tente novamente.')
     });
   }
 
@@ -408,7 +583,11 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.form.latitude = latitude;
     this.form.longitude = longitude;
     this.marker?.remove();
-    this.marker = L.marker([latitude, longitude]).addTo(this.map as L.Map);
+    if (this.map) {
+      this.marker = L.marker([latitude, longitude]).addTo(this.map);
+    }
+    this.updateTerritoryStatus();
+    this.renderTerritories();
   }
 
   private selectPoint(latitude: number, longitude: number): void {
@@ -421,10 +600,14 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
 
   private renderMarkers(items: Visit[]): void {
     this.visitLayer.clearLayers();
-    items.filter((visit) => visit.latitude && visit.longitude).forEach((visit) => {
+    const located = items.filter((visit) => visit.latitude != null && visit.longitude != null);
+    const visible = typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches
+      ? located.slice(0, 60)
+      : located;
+    visible.forEach((visit) => {
       L.circleMarker([visit.latitude as number, visit.longitude as number], {
         radius: 7,
-        color: visit.wantsVisits ? '#1f7a4d' : '#a04444',
+        color: this.cssColor(visit.wantsVisits ? '--color-success' : '--color-error'),
         fillOpacity: 0.8
       }).bindPopup(`<strong>${visit.personName}</strong><br>${visit.neighborhood ?? visit.city}<br>${visit.wantsVisits ? 'Aceita visitas' : 'Nao aceita visitas'}`).addTo(this.visitLayer);
     });
@@ -438,11 +621,12 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.territories().forEach((territory) => {
       const points = this.pointsFromGeoJson(territory.polygonGeoJson);
       if (points.length >= 3) {
+        const selected = this.pointInsideTerritory(territory);
         const polygon = L.polygon(points, {
           color: territory.color,
           fillColor: territory.color,
-          fillOpacity: 0.12,
-          weight: 2
+          fillOpacity: selected ? 0.26 : 0.12,
+          weight: selected ? 4 : 2
         }).bindPopup(`<strong>${territory.name}</strong><br>${territory.teamName}`);
         polygon.on('click', (event: L.LeafletMouseEvent) => {
           if (this.canManageVisits()) {
@@ -520,7 +704,19 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
 
   private errorMessage(response: HttpErrorResponse): string {
     if (response.status === 401) {
-      return 'Sua sessao expirou. Faca login novamente.';
+      return 'Sua sessão expirou. Faça login novamente.';
+    }
+    if (response.status === 403) {
+      return 'Você não possui permissão para salvar esta ficha ou atuar neste território.';
+    }
+    if (response.status === 422) {
+      return 'Alguns dados da ficha não foram aceitos. Revise os campos e tente novamente.';
+    }
+    if (response.status === 408 || response.status === 504) {
+      return 'O servidor demorou para responder. Os campos foram mantidos; tente novamente.';
+    }
+    if (response.status >= 500) {
+      return 'O servidor está indisponível no momento. Os campos foram mantidos; tente novamente.';
     }
     const body = response.error;
     if (body?.detail) {
@@ -532,7 +728,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     if (body?.violations?.length) {
       return body.violations.map((violation: { message: string }) => violation.message).join(' ');
     }
-    return 'Nao foi possivel salvar. Revise os campos e tente novamente.';
+    return 'Não foi possível salvar. Revise os campos e tente novamente.';
   }
 
   offlineStatusText(): string {
@@ -563,18 +759,36 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       if (result.sent === 0 && result.failed === 0) {
         this.notifications.info('Não há fichas pendentes para sincronizar.');
       }
-    });
+    }).catch(() => this.fail('Não foi possível iniciar a sincronização. As fichas continuam salvas no aparelho.'));
+  }
+
+  removePending(id: number, personName: string): void {
+    if (!window.confirm(`Excluir a ficha pendente de ${personName || 'pessoa sem identificação'} deste aparelho?`)) {
+      return;
+    }
+    this.offlineQueue.remove(id)
+      .then(() => this.notifications.info('Ficha pendente excluída do aparelho.'))
+      .catch(() => this.fail('Não foi possível excluir a ficha pendente.'));
   }
 
   private handleSaveError(response: HttpErrorResponse, payload: Visit, editing: boolean): void {
     if (!editing && this.isOfflineError(response)) {
-      this.offlineQueue.enqueue(payload).then(() => {
-        this.ok('Sem conexão. A ficha foi salva no aparelho e será enviada quando a internet voltar.');
-        this.resetForm();
-      }).catch(() => this.fail('Não foi possível salvar a ficha no aparelho.'));
+      this.enqueueOffline(payload);
       return;
     }
+    this.saving.set(false);
     this.fail(this.errorMessage(response));
+  }
+
+  private enqueueOffline(payload: Visit): void {
+    this.offlineQueue.enqueue(payload).then(() => {
+      this.saving.set(false);
+      this.ok('Sem conexão. A ficha foi salva no aparelho e será enviada quando a internet voltar.');
+      this.resetForm();
+    }).catch(() => {
+      this.saving.set(false);
+      this.fail('Não foi possível salvar a ficha no aparelho. Os campos foram mantidos para você tentar novamente.');
+    });
   }
 
   private isOfflineError(response: HttpErrorResponse): boolean {
@@ -595,8 +809,48 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
 
   private scrollMapIntoView(): void {
     if (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches) {
-      window.setTimeout(() => document.querySelector('.map-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+      this.showMobileView('map');
     }
+  }
+
+  private updateTerritoryStatus(): void {
+    if (!this.hasSelectedPoint()) {
+      this.territoryStatus.set('');
+      this.territoryOutside.set(false);
+      return;
+    }
+    const territory = this.territories().find((item) => this.pointInsideTerritory(item));
+    if (territory) {
+      this.territoryOutside.set(false);
+      this.territoryStatus.set(`Ponto dentro do território autorizado: ${territory.name}${territory.teamName ? ` (${territory.teamName})` : ''}.`);
+      return;
+    }
+    this.territoryOutside.set(true);
+    this.territoryStatus.set('Ponto fora dos territórios autorizados exibidos. As regras atuais do servidor serão respeitadas ao salvar.');
+  }
+
+  private pointInsideTerritory(territory: Territory): boolean {
+    if (!this.hasSelectedPoint()) {
+      return false;
+    }
+    const latitude = this.form.latitude as number;
+    const longitude = this.form.longitude as number;
+    const points = this.pointsFromGeoJson(territory.polygonGeoJson);
+    let inside = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+      const xi = points[i].lng;
+      const yi = points[i].lat;
+      const xj = points[j].lng;
+      const yj = points[j].lat;
+      const intersects = ((yi > latitude) !== (yj > latitude))
+        && (longitude < (xj - xi) * (latitude - yi) / (yj - yi) + xi);
+      if (intersects) inside = !inside;
+    }
+    return inside;
+  }
+
+  private cssColor(variable: string): string {
+    return getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
   }
 
   private ok(message: string): void {

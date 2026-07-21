@@ -5,7 +5,19 @@
     <title>Vinde Sertao</title>
     <base href="/">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#276749">
+    <meta name="theme-color" content="#1E4D5C">
+    <script>
+      (() => {
+        try {
+          const preference = localStorage.getItem('vinde.theme') || 'system';
+          const theme = preference === 'light' || preference === 'dark'
+            ? preference
+            : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+        } catch (_) {}
+      })();
+    </script>
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="apple-touch-icon" href="/assets/logo-vinde-sertao.webp">
     <link rel="icon" type="image/webp" href="/assets/logo-vinde-sertao.webp">

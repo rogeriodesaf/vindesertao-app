@@ -2,6 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { Dashboard } from '../core/models';
+import { NotificationService } from '../core/notification.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -138,7 +139,7 @@ export class DashboardComponent implements OnInit {
   to = '';
   dailyGoal = Number(localStorage.getItem('vinde.dashboard.dailyGoal') || 20);
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private notifications: NotificationService) {}
 
   ngOnInit(): void {
     this.load();
@@ -174,7 +175,7 @@ export class DashboardComponent implements OnInit {
   printReport(): void {
     const printWindow = window.open('', '_blank', 'width=1200,height=800');
     if (!printWindow) {
-      alert('Não foi possível abrir o relatório em uma nova aba. Libere pop-ups para gerar o PDF sem sair do sistema.');
+      this.notifications.warning('Não foi possível abrir o relatório. Libere pop-ups para gerar o PDF sem sair do sistema.');
       return;
     }
     const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
@@ -182,6 +183,12 @@ export class DashboardComponent implements OnInit {
       .join('\n');
     const dashboard = document.querySelector('.page')?.outerHTML ?? '';
     const shouldAutoPrint = !this.isCompactScreen();
+    const surface = this.cssColor('--color-surface');
+    const border = this.cssColor('--color-border');
+    const primary = this.cssColor('--color-primary');
+    const onPrimary = this.cssColor('--color-on-primary');
+    const hover = this.cssColor('--color-hover');
+    const text = this.cssColor('--color-text');
     printWindow.document.write(`
       <!doctype html>
       <html lang="pt-BR">
@@ -198,23 +205,23 @@ export class DashboardComponent implements OnInit {
               gap: 10px;
               justify-content: flex-end;
               padding: 12px;
-              background: #ffffff;
-              border-bottom: 1px solid #dbe3dc;
+              background: ${surface};
+              border-bottom: 1px solid ${border};
             }
             .print-toolbar button {
               min-height: 40px;
               border: 0;
               border-radius: 6px;
               padding: 0 14px;
-              background: #276749;
-              color: #ffffff;
+              background: ${primary};
+              color: ${onPrimary};
               font: inherit;
               font-weight: 700;
             }
             .print-toolbar button.secondary {
-              background: #eef2ee;
-              color: #1d2a24;
-              border: 1px solid #dbe3dc;
+              background: ${hover};
+              color: ${text};
+              border: 1px solid ${border};
             }
             @media print {
               .print-toolbar { display: none !important; }
@@ -309,6 +316,10 @@ export class DashboardComponent implements OnInit {
       .replace(/'/g, '&#39;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
+  }
+
+  private cssColor(variable: string): string {
+    return getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
   }
 
   private slug(value: string): string {

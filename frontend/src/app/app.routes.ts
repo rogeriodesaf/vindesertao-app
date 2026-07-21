@@ -13,9 +13,12 @@ import { SocialAssistanceComponent } from './social-assistance/social-assistance
 import { FinanceComponent } from './finance/finance.component';
 import { ChildrenComponent } from './children/children.component';
 import { EvangelisticSupportComponent } from './evangelistic-support/evangelistic-support.component';
+import { PasswordRecoveryComponent } from './auth/password-recovery.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
+  { path: 'forgot-password', component: PasswordRecoveryComponent },
+  { path: 'reset-password', component: PasswordRecoveryComponent },
   { path: 'change-password', component: ChangePasswordComponent, canActivate: [authGuard] },
   { path: 'visits', component: VisitsComponent, canActivate: [authGuard] },
   { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard], data: { canViewReports: true } },

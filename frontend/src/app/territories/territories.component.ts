@@ -220,7 +220,11 @@ export class TerritoriesComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private blank(): Territory {
-    return { name: '', teamId: this.visitTeams()[0]?.id ?? 0, color: '#276749', polygonGeoJson: '', active: true, enforceForProjectists: false };
+    return { name: '', teamId: this.visitTeams()[0]?.id ?? 0, color: this.cssColor('--color-primary'), polygonGeoJson: '', active: true, enforceForProjectists: false };
+  }
+
+  private cssColor(variable: string): string {
+    return getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
   }
 
   visitTeams(): Team[] {

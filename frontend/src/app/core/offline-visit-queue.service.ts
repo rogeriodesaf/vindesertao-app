@@ -14,7 +14,10 @@ export interface PendingVisit {
 @Injectable({ providedIn: 'root' })
 export class OfflineVisitQueueService {
   pendingCount = signal(0);
+  pendingItems = signal<PendingVisit[]>([]);
+  syncing = signal(false);
   private dbPromise?: Promise<IDBDatabase>;
+  private syncPromise?: Promise<{ sent: number; failed: number }>;
 
   constructor(private api: ApiService) {
     this.refreshCount();
@@ -37,7 +40,25 @@ export class OfflineVisitQueueService {
     return this.readAll(db);
   }
 
-  async sync(): Promise<{ sent: number; failed: number }> {
+  sync(): Promise<{ sent: number; failed: number }> {
+    if (this.syncPromise) {
+      return this.syncPromise;
+    }
+    this.syncing.set(true);
+    this.syncPromise = this.runSync().finally(() => {
+      this.syncing.set(false);
+      this.syncPromise = undefined;
+    });
+    return this.syncPromise;
+  }
+
+  async remove(id: number): Promise<void> {
+    const db = await this.db();
+    await this.delete(db, id);
+    await this.refreshCount();
+  }
+
+  private async runSync(): Promise<{ sent: number; failed: number }> {
     const db = await this.db();
     const items = await this.readAll(db);
     let sent = 0;
@@ -66,8 +87,10 @@ export class OfflineVisitQueueService {
       const db = await this.db();
       const items = await this.readAll(db);
       this.pendingCount.set(items.length);
+      this.pendingItems.set(items);
     } catch {
       this.pendingCount.set(0);
+      this.pendingItems.set([]);
     }
   }
 
@@ -118,6 +141,17 @@ export class OfflineVisitQueueService {
   }
 
   private message(error: unknown): string {
+    if (error && typeof error === 'object' && 'status' in error) {
+      const response = error as { status?: number; error?: { detail?: string } };
+      if (response.error?.detail) {
+        return response.error.detail;
+      }
+      if (response.status === 401) return 'Sessão expirada. Entre novamente antes de sincronizar.';
+      if (response.status === 403) return 'Usuário sem permissão para enviar esta ficha.';
+      if (response.status === 422) return 'A ficha possui dados que precisam ser revisados.';
+      if (response.status && response.status >= 500) return 'Servidor indisponível. A ficha permanece neste aparelho.';
+      if (response.status === 0) return 'Sem conexão com o servidor.';
+    }
     if (error && typeof error === 'object' && 'message' in error) {
       return String((error as { message?: string }).message || 'Falha ao sincronizar.');
     }
