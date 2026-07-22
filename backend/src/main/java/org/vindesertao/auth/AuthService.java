@@ -55,17 +55,20 @@ public class AuthService {
 
     public LoginResponse toResponse(AppUser user) {
         long expiresIn = TOKEN_TTL.toSeconds();
-        String token = Jwt.issuer(issuer)
+        var tokenBuilder = Jwt.issuer(issuer)
                 .subject(user.email)
                 .upn(user.email)
                 .groups(user.roleSet())
                 .claim("uid", user.id)
-                .claim("team_id", user.team == null ? null : user.team.id)
                 .claim("must_change_password", user.mustChangePassword)
                 .claim("can_register_visits", user.canRegisterVisits)
                 .claim("can_view_reports", user.canViewReports)
                 .claim("can_access_finance", user.canAccessFinance)
-                .claim("can_access_children", user.canAccessChildren)
+                .claim("can_access_children", user.canAccessChildren);
+        if (user.team != null) {
+            tokenBuilder.claim("team_id", user.team.id);
+        }
+        String token = tokenBuilder
                 .expiresIn(TOKEN_TTL)
                 .sign();
         return new LoginResponse(token, "Bearer", expiresIn,
