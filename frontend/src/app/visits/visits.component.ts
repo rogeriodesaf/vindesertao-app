@@ -12,12 +12,16 @@ import { Territory, Visit } from '../core/models';
 import { NotificationService } from '../core/notification.service';
 import { OfflineVisitQueueService } from '../core/offline-visit-queue.service';
 import { EmptyStateComponent } from '../shared/empty-state.component';
-import { ListCardComponent } from '../shared/list-card.component';
+import { ListCardComponent, ListCardInfo } from '../shared/list-card.component';
+import { FormSectionComponent } from '../shared/form-section.component';
+
+type VisitFormSection = 'basic' | 'location' | 'photo' | 'more' | 'visits';
+type LocationSource = 'none' | 'gps' | 'map' | 'manual' | 'address';
 
 @Component({
   selector: 'app-visits',
   standalone: true,
-  imports: [FormsModule, SlicePipe, ListCardComponent, EmptyStateComponent],
+  imports: [FormsModule, SlicePipe, ListCardComponent, EmptyStateComponent, FormSectionComponent],
   template: `
     <div class="mobile-view-toggle" role="group" aria-label="Visualização da tela de visitas">
       <button type="button" [class.active]="mobileView() === 'form'" (click)="showMobileView('form')">Cadastro</button>
@@ -79,86 +83,76 @@ import { ListCardComponent } from '../shared/list-card.component';
         }
 
         @if (canManageVisits()) {
-          <h2>{{ editingId() ? 'Editar visita' : 'Nova visita' }}</h2>
-          <form #visitForm="ngForm" novalidate (ngSubmit)="save(visitForm)">
-            <label>Nome da pessoa<input name="personName" [(ngModel)]="form.personName" required></label>
-            <label>Telefone<input name="phone" type="tel" inputmode="tel" [(ngModel)]="form.phone"></label>
-            <label class="check-row">
-              <input name="wantsVisits" type="checkbox" [(ngModel)]="form.wantsVisits">
-              Deseja receber visitas?
-            </label>
-            <label>Pedido de oração<textarea name="prayerRequest" [(ngModel)]="form.prayerRequest"></textarea></label>
-            <label>Observações<textarea name="notes" [(ngModel)]="form.notes"></textarea></label>
+          <h2 class="visit-form-title">{{ editingId() ? 'Editar visita' : 'Nova visita' }}</h2>
+          <form #visitForm="ngForm" class="visit-accordion-form" novalidate (ngSubmit)="save(visitForm)">
+            <app-form-section title="Informações básicas" subtitle="Dados principais da visita" icon="person" tone="cyan" sectionId="visit-basic"
+              [open]="openSection() === 'basic'" [error]="sectionError() === 'basic'" (toggle)="toggleSection('basic')">
+              <label for="visit-person-name">Nome da pessoa<input id="visit-person-name" name="personName" [(ngModel)]="form.personName" required [attr.aria-invalid]="sectionError() === 'basic' && !form.personName ? true : null" aria-describedby="visit-person-error"></label>
+              @if (sectionError() === 'basic' && !form.personName) { <small id="visit-person-error" class="field-error">Informe o nome da pessoa.</small> }
+              <label for="visit-phone">Telefone<input id="visit-phone" name="phone" type="tel" inputmode="tel" [(ngModel)]="form.phone"></label>
+              <label class="check-row" for="visit-wants"><input id="visit-wants" name="wantsVisits" type="checkbox" [(ngModel)]="form.wantsVisits"> Deseja receber visitas?</label>
+              <label for="visit-prayer">Pedido de oração<textarea id="visit-prayer" name="prayerRequest" [(ngModel)]="form.prayerRequest"></textarea></label>
+              <label for="visit-notes">Observações<textarea id="visit-notes" name="notes" [(ngModel)]="form.notes"></textarea></label>
+            </app-form-section>
 
-            <section class="location-card">
-              <div>
-                <strong>Localização</strong>
-                <span>{{ geolocationMessage() || 'Use o GPS ou marque o ponto diretamente no mapa.' }}</span>
-              </div>
-              <button type="button" class="secondary" [disabled]="geolocationState() === 'loading'" (click)="useMyLocation()">
-                {{ geolocationState() === 'loading' ? 'Buscando localização...' : 'Usar minha localização' }}
-              </button>
-              <div class="form-grid coordinates">
-                <label>Latitude<input name="latitude" type="number" step="any" [(ngModel)]="form.latitude" (ngModelChange)="manualCoordinatesChanged()"></label>
-                <label>Longitude<input name="longitude" type="number" step="any" [(ngModel)]="form.longitude" (ngModelChange)="manualCoordinatesChanged()"></label>
-              </div>
-              <button type="button" class="secondary mobile-only-action" (click)="showMobileView('map')">Abrir mapa para ajustar</button>
-              @if (territoryStatus()) {
-                <small [class.error]="territoryOutside()">{{ territoryStatus() }}</small>
-              }
-            </section>
+            <app-form-section title="Localização" subtitle="Onde esta visita ocorreu" icon="location" tone="green" sectionId="visit-location"
+              [badge]="hasSelectedPoint() ? 'Localização encontrada' : ''" [open]="openSection() === 'location'" [error]="sectionError() === 'location'" (toggle)="toggleSection('location')">
+              <div class="location-summary" role="status" aria-live="polite" [attr.data-state]="locationStateLabel()"><span class="location-summary-icon" aria-hidden="true">{{ locationStateIcon() }}</span><div><strong>{{ locationHeadline() }}</strong><span>{{ geolocationMessage() || locationAddress() }}</span>@if (locationAccuracy()) { <small>Precisão: ± {{ locationAccuracy() }} metros</small> }</div></div>
+              @if (sectionError() === 'location' && error()) { <small class="field-error">{{ error() }}</small> }
+              @if (territoryStatus()) { <div class="territory-form-alert" [class.warning]="territoryOutside()" role="status"><span aria-hidden="true">{{ territoryOutside() ? '!' : '✓' }}</span><div><strong>{{ territoryOutside() ? 'Atenção' : 'Território confirmado' }}</strong><small>{{ territoryStatus() }}</small></div></div> }
+              <div class="location-primary-actions"><button type="button" class="secondary" [disabled]="!hasSelectedPoint()" (click)="showMobileView('map')">Ver no mapa</button><button type="button" (click)="locationActionsOpen.set(true)">Alterar localização</button></div>
+              <details class="technical-details" [open]="technicalDetailsOpen()" (toggle)="technicalDetailsOpen.set($any($event.target).open)">
+                <summary>Detalhes técnicos</summary>
+                <div class="form-grid coordinates"><label for="visit-latitude">Latitude<input id="visit-latitude" name="latitude" type="number" step="any" [(ngModel)]="form.latitude" (ngModelChange)="manualCoordinatesChanged()"></label><label for="visit-longitude">Longitude<input id="visit-longitude" name="longitude" type="number" step="any" [(ngModel)]="form.longitude" (ngModelChange)="manualCoordinatesChanged()"></label></div>
+                <small>Origem: {{ locationSourceLabel() }}</small>
+              </details>
+            </app-form-section>
 
-            <div class="photo-field">
-              <strong>Foto da casa</strong>
-              <div class="photo-actions">
-                <label class="button">Abrir câmera<input class="visually-hidden" type="file" accept="image/*" capture="environment" (change)="attachPhoto($event)"></label>
-                <label class="button secondary">Escolher da galeria<input class="visually-hidden" type="file" accept="image/*" (change)="attachPhoto($event)"></label>
-              </div>
-              @if (photoPreview()) {
-                <div class="photo-preview">
-                  <img [src]="photoPreview()" alt="Foto anexada à ficha">
-                  <div>
-                    <strong>{{ form.photoFileName || 'Foto anexada' }}</strong>
-                    <small>Esta foto será salva junto com a ficha da casa.</small>
-                    <button type="button" class="secondary" (click)="removePhoto()">Remover foto</button>
-                  </div>
-                </div>
-              }
-            </div>
+            <app-form-section title="Foto da casa" subtitle="Registre a casa visitada" icon="photo" tone="purple" sectionId="visit-photo"
+              [badge]="photoPreview() ? 'Foto anexada' : ''" [open]="openSection() === 'photo'" (toggle)="toggleSection('photo')">
+              <div class="photo-actions"><label class="button">Abrir câmera<input class="visually-hidden" type="file" accept="image/*" capture="environment" (change)="attachPhoto($event)"></label><label class="button secondary">Escolher da galeria<input class="visually-hidden" type="file" accept="image/*" (change)="attachPhoto($event)"></label></div>
+              @if (photoPreview()) { <div class="photo-preview"><img [src]="photoPreview()" alt="Foto anexada à ficha"><div><strong>{{ form.photoFileName || 'Foto anexada' }}</strong><small>Esta foto será salva junto com a ficha da casa.</small><button type="button" class="secondary" (click)="removePhoto()">Remover foto</button></div></div> }
+            </app-form-section>
 
-            <details class="more-fields">
-              <summary>Mais informações</summary>
-              <div class="more-fields-content">
-                <div class="form-grid">
-                  <label>Rua<input name="street" [(ngModel)]="form.street"></label>
-                  <label>Número<input name="number" [(ngModel)]="form.number"></label>
-                </div>
-                <div class="form-grid">
-                  <label>Bairro<input name="neighborhood" [(ngModel)]="form.neighborhood"></label>
-                  <label>Cidade<input name="city" [(ngModel)]="form.city" required></label>
-                </div>
-                <label>Endereço manual<textarea name="manualAddress" [(ngModel)]="form.manualAddress"></textarea></label>
-                <div class="form-grid">
-                  <label>Idade<input name="personAge" type="number" min="0" [(ngModel)]="form.personAge"></label>
-                  <label>Moradores na casa<input name="householdSize" type="number" min="0" [(ngModel)]="form.householdSize"></label>
-                </div>
-                <label>Ponto de referência<textarea name="referencePoint" [(ngModel)]="form.referencePoint"></textarea></label>
-                <label>Próxima visita<input name="nextVisitAt" type="datetime-local" [ngModel]="toLocalDateTime(form.nextVisitAt)" (ngModelChange)="setNextVisitAt($event)"></label>
-                <label>Link do Street View<input name="streetViewUrl" type="url" placeholder="Cole aqui o link do Google Street View" [(ngModel)]="form.streetViewUrl"></label>
-                <button type="button" class="secondary" [disabled]="!hasStreetViewTarget()" (click)="openStreetView()">Ver no Street View</button>
-              </div>
-            </details>
+            <app-form-section title="Mais informações" subtitle="Dados complementares" icon="info" tone="orange" sectionId="visit-more"
+              [open]="openSection() === 'more'" [error]="sectionError() === 'more'" (toggle)="toggleSection('more')">
+              <div class="form-grid"><label for="visit-street">Rua<input id="visit-street" name="street" [(ngModel)]="form.street"></label><label for="visit-number">Número<input id="visit-number" name="number" [(ngModel)]="form.number"></label></div>
+              <div class="form-grid"><label for="visit-neighborhood">Bairro<input id="visit-neighborhood" name="neighborhood" [(ngModel)]="form.neighborhood"></label><label for="visit-city">Cidade<input id="visit-city" name="city" [(ngModel)]="form.city" required [attr.aria-invalid]="sectionError() === 'more' && !form.city ? true : null" aria-describedby="visit-city-error"></label></div>
+              @if (sectionError() === 'more' && !form.city) { <small id="visit-city-error" class="field-error">Informe a cidade.</small> }
+              <label for="visit-address">Endereço manual<textarea id="visit-address" name="manualAddress" [(ngModel)]="form.manualAddress"></textarea></label>
+              <div class="form-grid"><label for="visit-age">Idade<input id="visit-age" name="personAge" type="number" min="0" [(ngModel)]="form.personAge"></label><label for="visit-household">Moradores na casa<input id="visit-household" name="householdSize" type="number" min="0" [(ngModel)]="form.householdSize"></label></div>
+              <label for="visit-reference">Ponto de referência<textarea id="visit-reference" name="referencePoint" [(ngModel)]="form.referencePoint"></textarea></label>
+              <label for="visit-next">Próxima visita<input id="visit-next" name="nextVisitAt" type="datetime-local" [ngModel]="toLocalDateTime(form.nextVisitAt)" (ngModelChange)="setNextVisitAt($event)"></label>
+              <label for="visit-streetview">Link do Street View<input id="visit-streetview" name="streetViewUrl" type="url" placeholder="Cole aqui o link do Google Street View" [(ngModel)]="form.streetViewUrl"></label>
+              <button type="button" class="secondary" [disabled]="!hasStreetViewTarget()" (click)="openStreetView()">Ver no Street View</button>
+            </app-form-section>
+
+            <app-form-section title="Visitas da equipe" subtitle="Histórico de visitas" icon="groups" tone="blue" sectionId="visit-team-history"
+              [badge]="visits().length + ' visita(s)'" [open]="openSection() === 'visits'" (toggle)="toggleSection('visits')">
+              <div class="filters visit-section-filters"><div class="form-grid"><input aria-label="Filtrar por bairro" placeholder="Bairro" [(ngModel)]="filters.neighborhood" [ngModelOptions]="{standalone: true}" (keyup.enter)="loadVisits()"><select aria-label="Filtrar por interesse" [(ngModel)]="filters.wantsVisits" [ngModelOptions]="{standalone: true}" (change)="loadVisits()"><option value="">Todas</option><option value="true">Aceita</option><option value="false">Não aceita</option></select></div><button type="button" class="secondary full" [disabled]="loadingVisits()" (click)="loadVisits()">{{ loadingVisits() ? 'Carregando...' : 'Filtrar' }}</button></div>
+              <div class="visit-list unified-list">@for (visit of visits(); track visit.id) { <app-list-card [title]="visit.personName" [interactive]="true" (activate)="selectVisit(visit)" [infos]="visitCardInfos(visit)" /> } @empty { <app-empty-state message="Nenhuma visita encontrada." /> }</div>
+            </app-form-section>
             @if (message()) {
               <p class="success">{{ message() }}</p>
             }
             @if (error()) {
               <p class="error">{{ error() }}</p>
             }
-            <div class="actions">
-              <button type="submit" class="save-visit" [disabled]="saving()">{{ saving() ? 'Salvando...' : 'Salvar visita' }}</button>
+            <div class="actions visit-form-actions">
+              <button type="submit" class="save-visit" [class.loading]="saving()" [disabled]="saving()">{{ saving() ? 'Salvando...' : 'Salvar visita' }}</button>
               <button type="button" class="secondary" [disabled]="saving()" (click)="resetForm()">Limpar</button>
             </div>
           </form>
+          @if (locationActionsOpen()) {
+            <button type="button" class="location-sheet-backdrop" aria-label="Fechar opções de localização" (click)="locationActionsOpen.set(false)"></button>
+            <section class="location-action-sheet" role="dialog" aria-modal="true" aria-labelledby="location-sheet-title">
+              <h2 id="location-sheet-title">Alterar localização</h2>
+              <button type="button" [disabled]="geolocationState() === 'loading'" (click)="useMyLocation(); locationActionsOpen.set(false)"><strong>Usar minha localização</strong><small>Obter a localização atual pelo GPS</small></button>
+              <button type="button" (click)="showMobileView('map'); locationActionsOpen.set(false)"><strong>Abrir mapa para ajustar</strong><small>Mover o ponto no mapa</small></button>
+              <div class="location-address-action"><input aria-label="Inserir endereço" placeholder="Rua, bairro ou cidade" [(ngModel)]="searchText" (keyup.enter)="searchAddress(); locationActionsOpen.set(false)"><button type="button" (click)="searchAddress(); locationActionsOpen.set(false)">Buscar endereço</button></div>
+              <button type="button" class="secondary" (click)="locationActionsOpen.set(false)">Cancelar</button>
+            </section>
+          }
         } @else {
           <section class="map-summary-card">
             <h2>Mapa de visitas realizadas</h2>
@@ -167,32 +161,14 @@ import { ListCardComponent } from '../shared/list-card.component';
           </section>
         }
 
-        <div class="filters">
-          <h2>{{ visitListTitle() }}</h2>
-          <div class="form-grid">
-            <input placeholder="Bairro" [(ngModel)]="filters.neighborhood" (keyup.enter)="loadVisits()">
-            <select [(ngModel)]="filters.wantsVisits" (change)="loadVisits()">
-              <option value="">Todas</option>
-              <option value="true">Aceita</option>
-              <option value="false">Não aceita</option>
-            </select>
+        @if (!canManageVisits()) {
+          <div class="filters">
+            <h2>{{ visitListTitle() }}</h2>
+            <div class="form-grid"><input placeholder="Bairro" [(ngModel)]="filters.neighborhood" (keyup.enter)="loadVisits()"><select [(ngModel)]="filters.wantsVisits" (change)="loadVisits()"><option value="">Todas</option><option value="true">Aceita</option><option value="false">Não aceita</option></select></div>
+            <button type="button" class="secondary full" [disabled]="loadingVisits()" (click)="loadVisits()">{{ loadingVisits() ? 'Carregando...' : 'Filtrar' }}</button>
           </div>
-          <button type="button" class="secondary full" [disabled]="loadingVisits()" (click)="loadVisits()">{{ loadingVisits() ? 'Carregando...' : 'Filtrar' }}</button>
-        </div>
-
-        <div class="visit-list unified-list">
-          @for (visit of visits(); track visit.id) {
-            <app-list-card [title]="visit.personName" [interactive]="true" (activate)="selectVisit(visit)"
-              [infos]="[
-                { icon: 'location', text: visit.neighborhood || visit.manualAddress || visit.city },
-                { icon: 'volunteer', text: showResponsibleName() ? (visit.responsibleUserName || 'Responsável não informado') : '' },
-                { icon: 'description', text: visit.hasPhoto ? 'Foto anexada' : '' },
-                { icon: 'calendar', text: formatDate(visit.createdAt) }
-              ]" />
-          } @empty {
-            <app-empty-state message="Nenhuma visita encontrada." />
-          }
-        </div>
+          <div class="visit-list unified-list">@for (visit of visits(); track visit.id) { <app-list-card [title]="visit.personName" [interactive]="true" (activate)="selectVisit(visit)" [infos]="visitCardInfos(visit)" /> } @empty { <app-empty-state message="Nenhuma visita encontrada." /> }</div>
+        }
       </aside>
     </section>
   `
@@ -219,6 +195,12 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   mapLocationMessage = signal('');
   territoryStatus = signal('');
   territoryOutside = signal(false);
+  openSection = signal<VisitFormSection | null>('basic');
+  sectionError = signal<VisitFormSection | null>(null);
+  locationActionsOpen = signal(false);
+  technicalDetailsOpen = signal(false);
+  locationAccuracy = signal<number | null>(null);
+  locationSource = signal<LocationSource>('none');
   searchText = '';
   private map?: L.Map;
   private marker?: L.Marker;
@@ -263,6 +245,9 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         this.selectPoint(event.latlng.lat, event.latlng.lng);
       }
     });
+    if (this.hasSelectedPoint()) {
+      this.marker = L.marker([Number(this.form.latitude), Number(this.form.longitude)]).addTo(this.map);
+    }
     this.renderTerritories();
     this.renderMarkers(this.visits());
   }
@@ -338,6 +323,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         if (this.canManageVisits()) {
           this.form.manualAddress = first.display_name;
           this.selectPoint(Number(first.lat), Number(first.lon));
+          this.locationSource.set('address');
         }
         this.map?.setView([Number(first.lat), Number(first.lon)], 17);
       },
@@ -352,8 +338,9 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.message.set('');
     this.error.set('');
     if (form.invalid) {
-      const details = document.querySelector<HTMLDetailsElement>('.more-fields');
-      if (details) details.open = true;
+      const invalidName = Object.keys(form.controls).find((name) => form.controls[name].invalid) || 'personName';
+      const section: VisitFormSection = invalidName === 'personName' ? 'basic' : 'more';
+      this.openInvalidField(section, invalidName);
       this.fail('Preencha os campos obrigatórios antes de salvar.');
       return;
     }
@@ -385,8 +372,10 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.api.visit(visit.id).subscribe((fullVisit) => {
       this.form = { ...fullVisit };
       this.editingId.set(fullVisit.id ?? null);
+      this.openSection.set('basic');
       if (fullVisit.latitude && fullVisit.longitude) {
-        this.selectPoint(fullVisit.latitude, fullVisit.longitude);
+      this.selectPoint(fullVisit.latitude, fullVisit.longitude);
+      this.locationSource.set('manual');
         this.map?.setView([fullVisit.latitude, fullVisit.longitude], 17);
         this.scrollMapIntoView();
       }
@@ -417,6 +406,12 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.geolocationMessage.set('');
     this.territoryStatus.set('');
     this.territoryOutside.set(false);
+    this.openSection.set('basic');
+    this.sectionError.set(null);
+    this.locationActionsOpen.set(false);
+    this.technicalDetailsOpen.set(false);
+    this.locationAccuracy.set(null);
+    this.locationSource.set('none');
   }
 
   showMobileView(view: 'form' | 'map'): void {
@@ -445,6 +440,8 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       (position) => this.zone.run(() => {
         const { latitude, longitude } = position.coords;
         this.setPoint(latitude, longitude);
+        this.locationAccuracy.set(Math.round(position.coords.accuracy));
+        this.locationSource.set('gps');
         this.map?.setView([latitude, longitude], 18);
         this.geolocationState.set('success');
         this.geolocationMessage.set('Localização encontrada. Você ainda pode ajustar o ponto no mapa.');
@@ -518,8 +515,52 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     const latitude = Number(this.form.latitude);
     const longitude = Number(this.form.longitude);
     if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      this.locationSource.set('manual');
+      this.locationAccuracy.set(null);
       this.setPoint(latitude, longitude);
     }
+  }
+
+  toggleSection(section: VisitFormSection): void {
+    this.openSection.update((current) => current === section ? null : section);
+    this.sectionError.set(null);
+    requestAnimationFrame(() => document.getElementById(`visit-${section === 'visits' ? 'team-history' : section}`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+  }
+
+  locationHeadline(): string {
+    if (this.geolocationState() === 'loading') return 'Obtendo sua localização…';
+    if (this.geolocationState() === 'denied') return 'Permissão de localização não concedida';
+    if (this.geolocationState() === 'unavailable' || this.geolocationState() === 'timeout') return 'Não foi possível obter a localização';
+    if (this.hasSelectedPoint()) return this.locationSource() === 'map' ? 'Ponto selecionado no mapa' : 'Localização obtida com sucesso';
+    return 'Localização ainda não informada';
+  }
+
+  locationAddress(): string {
+    if (this.form.manualAddress?.trim()) return this.form.manualAddress.trim();
+    const street = [this.form.street, this.form.number].filter(Boolean).join(', ');
+    const place = [this.form.neighborhood, this.form.city].filter(Boolean).join(', ');
+    return [street, place].filter(Boolean).join(' · ') || 'Use o GPS, o mapa ou busque um endereço.';
+  }
+
+  locationStateLabel(): string {
+    if (this.geolocationState() === 'loading') return 'loading';
+    if (this.geolocationState() === 'denied' || this.geolocationState() === 'unavailable' || this.geolocationState() === 'timeout') return 'error';
+    return this.hasSelectedPoint() ? 'success' : 'idle';
+  }
+
+  locationStateIcon(): string { return this.locationStateLabel() === 'success' ? '✓' : this.locationStateLabel() === 'error' ? '!' : this.locationStateLabel() === 'loading' ? '…' : '⌖'; }
+
+  locationSourceLabel(): string {
+    return ({ none: 'não informada', gps: 'GPS', map: 'mapa', manual: 'coordenadas informadas', address: 'endereço pesquisado' } as const)[this.locationSource()];
+  }
+
+  visitCardInfos(visit: Visit): ListCardInfo[] {
+    return [
+      { icon: 'location', text: visit.neighborhood || visit.manualAddress || visit.city },
+      { icon: 'volunteer', text: this.showResponsibleName() ? (visit.responsibleUserName || 'Responsável não informado') : '' },
+      { icon: 'description', text: visit.hasPhoto ? 'Foto anexada' : '' },
+      { icon: 'calendar', text: this.formatDate(visit.createdAt) }
+    ];
   }
 
   hasSelectedPoint(): boolean {
@@ -655,6 +696,8 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
 
   private selectPoint(latitude: number, longitude: number): void {
     this.zone.run(() => {
+      this.locationSource.set('map');
+      this.locationAccuracy.set(null);
       this.setPoint(latitude, longitude);
       this.message.set('Ponto selecionado no mapa. Latitude e longitude foram preenchidas.');
       this.notifications.info('Ponto selecionado no mapa.');
@@ -843,7 +886,12 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.saving.set(false);
-    this.fail(this.errorMessage(response));
+    const message = this.errorMessage(response);
+    if (/territ[oó]rio|localiza|coordenada|ponto/i.test(message)) {
+      this.openSection.set('location');
+      this.sectionError.set('location');
+    }
+    this.fail(message);
   }
 
   private enqueueOffline(payload: Visit): void {
@@ -925,6 +973,16 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
 
   private cssColor(variable: string): string {
     return getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
+  }
+
+  private openInvalidField(section: VisitFormSection, fieldName: string): void {
+    this.openSection.set(section);
+    this.sectionError.set(section);
+    requestAnimationFrame(() => {
+      const field = document.querySelector<HTMLElement>(`[name="${fieldName}"]`);
+      field?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      field?.focus();
+    });
   }
 
   private ok(message: string): void {

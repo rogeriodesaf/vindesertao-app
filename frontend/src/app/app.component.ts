@@ -59,7 +59,10 @@ const icons = {
             }
           </nav>
           <div class="sidebar-session">
-            <span>{{ user.name }}</span>
+            <div class="authenticated-user" title="{{ displayName() }} — {{ userRoleLabel() }}">
+              <strong>{{ displayName() }}</strong>
+              <span>{{ userRoleLabel() }}</span>
+            </div>
             <button type="button" class="secondary theme-toggle" [attr.title]="theme.label()" (click)="theme.cycle()">
               <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path [attr.d]="theme.activeTheme() === 'dark' ? icons.moon : icons.sun"></path>
@@ -74,9 +77,11 @@ const icons = {
           <header class="mobile-topbar">
             <a class="brand" routerLink="/visits" (click)="closeMenu()" aria-label="Vinde Sertão">
               <img src="/assets/logo-vinde-sertao.webp" alt="">
-              <span>Vinde Sertão</span>
+              <span class="mobile-brand-copy">
+                <strong>Vinde Sertão</strong>
+                <small title="{{ displayName() }} — {{ userRoleLabel() }}">{{ displayName() }} • {{ userRoleLabel() }}</small>
+              </span>
             </a>
-            <span class="mobile-user">{{ user.name }}</span>
             <button type="button" class="secondary mobile-theme-toggle" [attr.aria-label]="theme.label()" [attr.title]="theme.label()" (click)="theme.cycle()">
               <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="theme.activeTheme() === 'dark' ? icons.moon : icons.sun"></path></svg>
             </button>
@@ -207,6 +212,18 @@ export class AppComponent {
 
   closeMenu(): void {
     this.menuOpen.set(false);
+  }
+
+  displayName(): string {
+    return this.auth.user()?.name?.trim() || 'Usuário';
+  }
+
+  userRoleLabel(): string {
+    const roles = this.auth.user()?.roles || [];
+    if (roles.includes('admin')) return 'Administrador';
+    if (roles.includes('lider')) return 'Líder';
+    if (roles.includes('projetista')) return 'Projetista';
+    return 'Usuário';
   }
 
   private item(label: string, shortLabel: string, path: string, icon: string): NavItem {
