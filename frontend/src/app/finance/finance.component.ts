@@ -3,11 +3,14 @@ import { FormsModule, NgForm } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { FinanceSummary, FinancialTransaction, FinancialTransactionType, PageResponse } from '../core/models';
 import { NotificationService } from '../core/notification.service';
+import { CompactPaginationComponent } from '../shared/compact-pagination.component';
+import { EmptyStateComponent } from '../shared/empty-state.component';
+import { ListCardComponent } from '../shared/list-card.component';
 
 @Component({
   selector: 'app-finance',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ListCardComponent, EmptyStateComponent, CompactPaginationComponent],
   template: `
     <section class="page">
       <div class="page-head">
@@ -136,31 +139,15 @@ import { NotificationService } from '../core/notification.service';
             </div>
           </div>
 
-          <div class="responsive-table">
-            <table>
-              <thead>
-                <tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th>Responsável</th></tr>
-              </thead>
-              <tbody>
-                @for (transaction of transactions(); track transaction.id) {
-                  <tr (click)="edit(transaction)">
-                    <td data-label="Data">{{ formatDate(transaction.transactionDate) }}</td>
-                    <td data-label="Tipo">{{ transaction.typeLabel }}</td>
-                    <td data-label="Categoria">{{ transaction.category }}</td>
-                    <td data-label="Descrição">{{ transaction.description }}</td>
-                    <td data-label="Valor">{{ signedMoney(transaction) }}</td>
-                    <td data-label="Responsável">{{ transaction.responsibleUserName || '-' }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+          <div class="unified-list">
+            @for (transaction of transactions(); track transaction.id) {
+              <app-list-card [title]="transaction.description" [state]="transaction.typeLabel || ''" [interactive]="true"
+                [actions]="[{ id: 'edit', label: 'Editar', icon: 'edit' }]" (activate)="edit(transaction)" (action)="edit(transaction)"
+                [infos]="[{ icon: 'calendar', text: formatDate(transaction.transactionDate) }, { icon: 'description', text: transaction.category }, { icon: 'money', text: signedMoney(transaction) }, { icon: 'volunteer', text: transaction.responsibleUserName || '-' }]" />
+            } @empty { <app-empty-state message="Nenhum lançamento encontrado." /> }
           </div>
-
-          <div class="pagination">
-            <button type="button" class="secondary" [disabled]="currentPage === 0" (click)="goToPage(currentPage - 1)">Anterior</button>
-            <span>Página {{ currentPage + 1 }} de {{ page()?.pages || 1 }}</span>
-            <button type="button" class="secondary" [disabled]="currentPage + 1 >= (page()?.pages || 1)" (click)="goToPage(currentPage + 1)">Próxima</button>
-          </div>
+          <app-compact-pagination [pageIndex]="currentPage" [totalPages]="page()?.pages || 1"
+            (previous)="goToPage(currentPage - 1)" (next)="goToPage(currentPage + 1)" />
         </section>
       }
     </section>

@@ -5,11 +5,13 @@ import * as L from 'leaflet';
 import { ApiService } from '../core/api.service';
 import { Team, Territory } from '../core/models';
 import { NotificationService } from '../core/notification.service';
+import { EmptyStateComponent } from '../shared/empty-state.component';
+import { ListCardComponent } from '../shared/list-card.component';
 
 @Component({
   selector: 'app-territories',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ListCardComponent, EmptyStateComponent],
   template: `
     <section class="page">
       <div class="page-head">
@@ -57,13 +59,14 @@ import { NotificationService } from '../core/notification.service';
 
         <aside class="detail-card">
           <h2>Territorios cadastrados</h2>
-          @for (territory of territories(); track territory.id) {
-            <button type="button" class="visit-row" (click)="edit(territory)">
-              <strong><span class="color-dot" [style.background]="territory.color"></span>{{ territory.name }}</strong>
-              <span>{{ territory.teamName }}</span>
-              <small>{{ territory.active ? 'Ativo' : 'Inativo' }} | {{ territory.enforceForProjectists ? 'Regra ativa' : 'Sem bloqueio' }}</small>
-            </button>
-          }
+          <div class="unified-list">
+            @for (territory of territories(); track territory.id) {
+              <app-list-card [title]="territory.name" [color]="territory.color" [state]="territory.active ? 'Ativo' : 'Inativo'"
+                [interactive]="true" [actions]="[{ id: 'edit', label: 'Editar', icon: 'edit' }]"
+                [infos]="[{ icon: 'groups', text: territory.teamName }, { icon: 'status', text: territory.enforceForProjectists ? 'Regra ativa' : 'Sem bloqueio' }]"
+                (activate)="edit(territory)" (action)="edit(territory)" />
+            } @empty { <app-empty-state message="Nenhum território cadastrado." /> }
+          </div>
         </aside>
       </div>
     </section>

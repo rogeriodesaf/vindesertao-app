@@ -11,11 +11,13 @@ import { formatDateTime } from '../core/date-format';
 import { Territory, Visit } from '../core/models';
 import { NotificationService } from '../core/notification.service';
 import { OfflineVisitQueueService } from '../core/offline-visit-queue.service';
+import { EmptyStateComponent } from '../shared/empty-state.component';
+import { ListCardComponent } from '../shared/list-card.component';
 
 @Component({
   selector: 'app-visits',
   standalone: true,
-  imports: [FormsModule, SlicePipe],
+  imports: [FormsModule, SlicePipe, ListCardComponent, EmptyStateComponent],
   template: `
     <div class="mobile-view-toggle" role="group" aria-label="Visualização da tela de visitas">
       <button type="button" [class.active]="mobileView() === 'form'" (click)="showMobileView('form')">Cadastro</button>
@@ -29,6 +31,11 @@ import { OfflineVisitQueueService } from '../core/offline-visit-queue.service';
           <button type="button" class="secondary" [disabled]="exporting()" (click)="downloadExcel()">{{ exporting() ? 'Gerando...' : 'Excel' }}</button>
         </div>
         <div id="visit-map" class="map"></div>
+        <button type="button" class="map-location-button" [disabled]="locatingMap()"
+          aria-label="Centralizar na minha localização" title="Minha localização" (click)="locateUser(true)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v3m0 14v3M2 12h3m14 0h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"></path></svg>
+        </button>
+        @if (mapLocationMessage()) { <div class="map-location-message">{{ mapLocationMessage() }}</div> }
         @if (territoryStatus()) {
           <div class="territory-status" [class.outside]="territoryOutside()">{{ territoryStatus() }}</div>
         }
@@ -173,19 +180,17 @@ import { OfflineVisitQueueService } from '../core/offline-visit-queue.service';
           <button type="button" class="secondary full" [disabled]="loadingVisits()" (click)="loadVisits()">{{ loadingVisits() ? 'Carregando...' : 'Filtrar' }}</button>
         </div>
 
-        <div class="visit-list">
+        <div class="visit-list unified-list">
           @for (visit of visits(); track visit.id) {
-            <button type="button" class="visit-row" (click)="selectVisit(visit)">
-              <strong>{{ visit.personName }}</strong>
-              <span>{{ visit.neighborhood || visit.manualAddress || visit.city }}</span>
-              @if (showResponsibleName()) {
-                <small>{{ visit.responsibleUserName || 'Responsável não informado' }}</small>
-              }
-              @if (visit.hasPhoto) {
-                <small>Foto anexada</small>
-              }
-              <small>{{ formatDate(visit.createdAt) }}</small>
-            </button>
+            <app-list-card [title]="visit.personName" [interactive]="true" (activate)="selectVisit(visit)"
+              [infos]="[
+                { icon: 'location', text: visit.neighborhood || visit.manualAddress || visit.city },
+                { icon: 'volunteer', text: showResponsibleName() ? (visit.responsibleUserName || 'Responsável não informado') : '' },
+                { icon: 'description', text: visit.hasPhoto ? 'Foto anexada' : '' },
+                { icon: 'calendar', text: formatDate(visit.createdAt) }
+              ]" />
+          } @empty {
+            <app-empty-state message="Nenhuma visita encontrada." />
           }
         </div>
       </aside>
@@ -210,20 +215,36 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   mobileView = signal<'form' | 'map'>('form');
   geolocationState = signal<'idle' | 'loading' | 'success' | 'denied' | 'unavailable' | 'timeout'>('idle');
   geolocationMessage = signal('');
+  locatingMap = signal(false);
+  mapLocationMessage = signal('');
   territoryStatus = signal('');
   territoryOutside = signal(false);
   searchText = '';
   private map?: L.Map;
   private marker?: L.Marker;
+  private userLocationMarker?: L.CircleMarker;
+  private userCoordinates?: L.LatLngTuple;
   private visitLayer = L.layerGroup();
   private territoryLayer = L.layerGroup();
   private refreshHandle?: ReturnType<typeof setInterval>;
-  private fittedInitialContent = false;
   private mapTileWarningShown = false;
 
   constructor(public api: ApiService, private http: HttpClient, private auth: AuthService, private zone: NgZone, private notifications: NotificationService, public offlineQueue: OfflineVisitQueueService) {}
 
   ngAfterViewInit(): void {
+    if (!window.matchMedia('(max-width: 900px)').matches) this.initializeMap();
+    this.loadTerritories();
+    this.loadVisits();
+    if (!this.canManageVisits()) this.refreshHandle = setInterval(() => this.loadVisits(), 30000);
+    window.addEventListener('online', this.handleOnline);
+    window.addEventListener('offline', this.handleOffline);
+    window.addEventListener('resize', this.handleResize);
+    window.addEventListener('orientationchange', this.handleResize);
+    this.offlineQueue.refreshCount();
+  }
+
+  private initializeMap(): void {
+    if (this.map) return;
     this.map = L.map('visit-map', { zoomControl: false }).setView([-7.229, -39.313], 13);
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -242,14 +263,8 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         this.selectPoint(event.latlng.lat, event.latlng.lng);
       }
     });
-    this.loadTerritories();
-    this.loadVisits();
-    if (!this.canManageVisits()) {
-      this.refreshHandle = setInterval(() => this.loadVisits(), 30000);
-    }
-    window.addEventListener('online', this.handleOnline);
-    window.addEventListener('offline', this.handleOffline);
-    this.offlineQueue.refreshCount();
+    this.renderTerritories();
+    this.renderMarkers(this.visits());
   }
 
   ngOnDestroy(): void {
@@ -258,6 +273,8 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     }
     window.removeEventListener('online', this.handleOnline);
     window.removeEventListener('offline', this.handleOffline);
+    window.removeEventListener('resize', this.handleResize);
+    window.removeEventListener('orientationchange', this.handleResize);
     this.map?.remove();
   }
 
@@ -272,7 +289,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         next: (page) => {
           this.visits.set(page.items);
           this.renderMarkers(page.items);
-          this.fitInitialContent();
+          this.refreshMapView();
         },
         error: () => this.fail('Não foi possível carregar as visitas. O formulário continua disponível.')
       });
@@ -288,7 +305,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         this.territories.set(territories);
         this.renderTerritories();
         this.updateTerritoryStatus();
-        this.fitInitialContent();
+        this.refreshMapView();
       },
       error: () => this.notifications.error('Não foi possível carregar os territórios. Tente novamente mais tarde.')
     });
@@ -405,10 +422,14 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   showMobileView(view: 'form' | 'map'): void {
     this.mobileView.set(view);
     if (view === 'map') {
-      window.setTimeout(() => {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        this.initializeMap();
         this.map?.invalidateSize();
+        this.renderMarkers(this.visits());
+        this.renderTerritories();
+        this.locateUser(false);
         document.querySelector('.mobile-view-toggle')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 0);
+      }));
     }
   }
 
@@ -442,7 +463,49 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         }
         this.notifications.error(this.geolocationMessage());
       }),
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  }
+
+  locateUser(centerMap = false): void {
+    if (this.locatingMap()) return;
+    if (!navigator.geolocation) {
+      this.mapLocationMessage.set('Localização não suportada neste dispositivo.');
+      this.notifications.warning(this.mapLocationMessage());
+      this.refreshMapView();
+      return;
+    }
+    this.locatingMap.set(true);
+    this.mapLocationMessage.set('Obtendo sua localização...');
+    navigator.geolocation.getCurrentPosition(
+      position => this.zone.run(() => {
+        const point: L.LatLngTuple = [position.coords.latitude, position.coords.longitude];
+        this.userCoordinates = point;
+        if (this.userLocationMarker) this.userLocationMarker.setLatLng(point);
+        else {
+          this.userLocationMarker = L.circleMarker(point, {
+            radius: 9, color: '#ffffff', weight: 3, fillColor: '#1976d2', fillOpacity: 1
+          }).bindPopup('Você está aqui');
+          this.userLocationMarker.addTo(this.map as L.Map);
+        }
+        this.locatingMap.set(false);
+        this.mapLocationMessage.set('Você está aqui');
+        this.map?.invalidateSize();
+        if (centerMap) this.map?.setView(point, 16);
+        else this.refreshMapView();
+      }),
+      error => this.zone.run(() => {
+        this.locatingMap.set(false);
+        const message = error.code === error.PERMISSION_DENIED
+          ? 'Permissão de localização não concedida.'
+          : error.code === error.TIMEOUT
+            ? 'A localização demorou mais que o esperado.'
+            : 'Não foi possível obter sua localização.';
+        this.mapLocationMessage.set(message);
+        this.notifications.warning(message);
+        this.refreshMapView();
+      }),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   }
 
@@ -600,12 +663,12 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
 
   private renderMarkers(items: Visit[]): void {
     this.visitLayer.clearLayers();
-    const located = items.filter((visit) => visit.latitude != null && visit.longitude != null);
+    const located = items.filter(visit => this.validCoordinates(visit.latitude, visit.longitude));
     const visible = typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches
       ? located.slice(0, 60)
       : located;
     visible.forEach((visit) => {
-      L.circleMarker([visit.latitude as number, visit.longitude as number], {
+      L.circleMarker([Number(visit.latitude), Number(visit.longitude)], {
         radius: 7,
         color: this.cssColor(visit.wantsVisits ? '--color-success' : '--color-error'),
         fillOpacity: 0.8
@@ -638,22 +701,25 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  private fitInitialContent(): void {
-    if (!this.map || this.fittedInitialContent) {
-      return;
+  private refreshMapView(): void {
+    if (!this.map) return;
+    const points: L.LatLngTuple[] = this.visits()
+      .filter(visit => this.validCoordinates(visit.latitude, visit.longitude))
+      .map(visit => [Number(visit.latitude), Number(visit.longitude)]);
+    if (this.userCoordinates) points.push(this.userCoordinates);
+    if (points.length > 1) {
+      this.map.fitBounds(L.latLngBounds(points), { padding: [30, 30], maxZoom: 17 });
+    } else if (points.length === 1) {
+      this.map.setView(points[0], 16);
+    } else {
+      this.map.setView([-7.229, -39.313], 13);
     }
-    const bounds = L.latLngBounds([]);
-    this.territories().forEach((territory) => {
-      this.pointsFromGeoJson(territory.polygonGeoJson).forEach((point) => bounds.extend(point));
-    });
-    this.visits()
-      .filter((visit) => visit.latitude && visit.longitude)
-      .forEach((visit) => bounds.extend([visit.latitude as number, visit.longitude as number]));
-    if (!bounds.isValid()) {
-      return;
-    }
-    this.fittedInitialContent = true;
-    this.map.fitBounds(bounds.pad(0.2), { maxZoom: 16 });
+  }
+
+  private validCoordinates(latitude: unknown, longitude: unknown): boolean {
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 && !(lat === 0 && lng === 0);
   }
 
   private pointsFromGeoJson(value: string): L.LatLng[] {
@@ -805,6 +871,14 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   private handleOffline = (): void => {
     this.online.set(false);
     this.notifications.info('Você está sem internet. Novas fichas serão salvas no aparelho.');
+  };
+
+  private handleResize = (): void => {
+    if (!this.map || (window.matchMedia('(max-width: 900px)').matches && this.mobileView() !== 'map')) return;
+    requestAnimationFrame(() => {
+      this.map?.invalidateSize();
+      this.refreshMapView();
+    });
   };
 
   private scrollMapIntoView(): void {

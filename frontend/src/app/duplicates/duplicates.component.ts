@@ -3,10 +3,13 @@ import { ApiService } from '../core/api.service';
 import { formatDateTime } from '../core/date-format';
 import { DuplicateVisitGroup, Visit } from '../core/models';
 import { NotificationService } from '../core/notification.service';
+import { EmptyStateComponent } from '../shared/empty-state.component';
+import { ListCardComponent } from '../shared/list-card.component';
 
 @Component({
   selector: 'app-duplicates',
   standalone: true,
+  imports: [ListCardComponent, EmptyStateComponent],
   template: `
     <section class="page">
       <div class="page-head">
@@ -29,20 +32,19 @@ import { NotificationService } from '../core/notification.service';
           <section class="detail-card">
             <h2>{{ group.reason }}</h2>
             <p class="muted">{{ group.visits.length }} fichas parecidas encontradas.</p>
-            @for (visit of group.visits; track visit.id) {
-              <label class="info-row selectable">
-                <input type="radio" name="target-{{ group.reason }}" [checked]="targetId(group) === visit.id" (change)="setTarget(group, visit)">
-                <div>
-                  <strong>#{{ visit.id }} - {{ visit.personName }}</strong>
-                  <span>{{ visit.phone || 'Sem telefone' }} | {{ visit.street || visit.manualAddress || '-' }}, {{ visit.number || '-' }}</span>
-                  <small>{{ visit.responsibleUserName || '-' }} | {{ formatDate(visit.createdAt) }}</small>
-                </div>
-              </label>
-            }
+            <div class="unified-list">
+              @for (visit of group.visits; track visit.id) {
+                <app-list-card [title]="'#' + visit.id + ' - ' + visit.personName" [interactive]="true"
+                  [selected]="targetId(group) === visit.id" [state]="targetId(group) === visit.id ? 'Ficha principal' : ''"
+                  [actions]="[{ id: 'primary', label: 'Definir como principal', icon: 'status' }]"
+                  [infos]="[{ icon: 'phone', text: visit.phone || 'Sem telefone' }, { icon: 'location', text: (visit.street || visit.manualAddress || '-') + ', ' + (visit.number || '-') }, { icon: 'volunteer', text: visit.responsibleUserName || '-' }, { icon: 'calendar', text: formatDate(visit.createdAt) }]"
+                  (activate)="setTarget(group, visit)" (action)="setTarget(group, visit)" />
+              }
+            </div>
             <button type="button" class="secondary" (click)="merge(group)">Mesclar nesta ficha principal</button>
           </section>
         } @empty {
-          <p class="muted">Nenhuma duplicidade provavel encontrada.</p>
+          <app-empty-state message="Nenhuma duplicidade provável encontrada." />
         }
       </div>
     </section>

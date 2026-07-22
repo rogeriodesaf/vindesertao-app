@@ -6,13 +6,16 @@ import { ApiService } from '../core/api.service';
 import { formatDateTime } from '../core/date-format';
 import { AppUser, Role, Team, UserSummary, UserTeamHistory } from '../core/models';
 import { NotificationService } from '../core/notification.service';
+import { CompactPaginationComponent } from '../shared/compact-pagination.component';
+import { EmptyStateComponent } from '../shared/empty-state.component';
+import { ListCardComponent } from '../shared/list-card.component';
 
 const roles: Role[] = ['admin', 'lider', 'projetista'];
 
 @Component({
   selector: 'app-users',
   standalone: true,
-  imports: [FormsModule, SlicePipe],
+  imports: [FormsModule, SlicePipe, ListCardComponent, EmptyStateComponent, CompactPaginationComponent],
   template: `
     <section class="page users-page">
       <div class="page-head">
@@ -102,17 +105,12 @@ const roles: Role[] = ['admin', 'lider', 'projetista'];
           @if (form.id) {
             <section class="detail-section compact-history">
               <h2>Historico de equipe</h2>
-              @for (entry of teamHistory(); track entry.id) {
-                <div class="info-row">
-                  <div>
-                    <strong>{{ entry.oldTeamName || 'Sem equipe' }} -> {{ entry.newTeamName || 'Sem equipe' }}</strong>
-                    <span>{{ entry.changedByEmail || '-' }}</span>
-                  </div>
-                  <small>{{ formatDate(entry.changedAt) }}</small>
-                </div>
-              } @empty {
-                <p class="muted">Nenhuma troca de equipe registrada.</p>
-              }
+              <div class="unified-list">
+                @for (entry of teamHistory(); track entry.id) {
+                  <app-list-card [title]="(entry.oldTeamName || 'Sem equipe') + ' → ' + (entry.newTeamName || 'Sem equipe')"
+                    [infos]="[{ icon: 'email', text: entry.changedByEmail || '-' }, { icon: 'calendar', text: formatDate(entry.changedAt) }]" />
+                } @empty { <app-empty-state message="Nenhuma troca de equipe registrada." /> }
+              </div>
             </section>
           }
         </form>
@@ -140,30 +138,14 @@ const roles: Role[] = ['admin', 'lider', 'projetista'];
               </label>
             </div>
           </div>
-          <table>
-            <thead>
-              <tr><th>Nome</th><th>E-mail</th><th>Equipe principal</th><th>Outras equipes</th><th>Permissoes</th><th>Acessos</th><th>Status</th><th>Senha</th></tr>
-            </thead>
-            <tbody>
-              @for (user of users(); track user.id) {
-                <tr (click)="edit(user)">
-                  <td data-label="Nome">{{ user.name }}</td>
-                  <td data-label="E-mail">{{ user.email }}</td>
-                  <td data-label="Equipe principal">{{ user.teamName || '-' }}</td>
-                  <td data-label="Outras equipes">{{ user.additionalTeamNames?.join(', ') || '-' }}</td>
-                  <td data-label="Permissoes">{{ user.roles.join(', ') }}</td>
-                  <td data-label="Acessos">{{ accessSummary(user) }}</td>
-                  <td data-label="Status">{{ user.active ? 'Ativo' : 'Inativo' }}</td>
-                  <td data-label="Senha">{{ user.mustChangePassword ? 'Troca pendente' : 'Definida' }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-          <div class="pagination">
-            <button type="button" class="secondary" [disabled]="pageIndex() === 0" (click)="previousPage()">Anterior</button>
-            <span>Pagina {{ pageIndex() + 1 }} de {{ totalPages() }}</span>
-            <button type="button" class="secondary" [disabled]="pageIndex() + 1 >= totalPages()" (click)="nextPage()">Proxima</button>
+          <div class="unified-list">
+            @for (user of users(); track user.id) {
+              <app-list-card [title]="user.name" [state]="user.active ? 'Ativo' : 'Inativo'" [interactive]="true"
+                [actions]="[{ id: 'edit', label: 'Editar', icon: 'edit' }]" (activate)="edit(user)" (action)="edit(user)"
+                [infos]="[{ icon: 'email', text: user.email }, { icon: 'groups', text: user.teamName || '-' }, { icon: 'groups', text: user.additionalTeamNames?.join(', ') || '' }, { icon: 'status', text: user.roles.join(', ') }, { icon: 'open', text: accessSummary(user) }, { icon: 'status', text: user.mustChangePassword ? 'Troca de senha pendente' : 'Senha definida' }]" />
+            } @empty { <app-empty-state message="Nenhum usuário encontrado." /> }
           </div>
+          <app-compact-pagination [pageIndex]="pageIndex()" [totalPages]="totalPages()" (previous)="previousPage()" (next)="nextPage()" />
         </div>
         }
       </div>

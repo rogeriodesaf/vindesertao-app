@@ -1,9 +1,12 @@
 import { Component, computed, signal } from '@angular/core';
 import { reformedKnowledgeBase } from './reformed-knowledge-base';
+import { EmptyStateComponent } from '../shared/empty-state.component';
+import { ListCardComponent } from '../shared/list-card.component';
 
 @Component({
   selector: 'app-evangelistic-support',
   standalone: true,
+  imports: [ListCardComponent, EmptyStateComponent],
   template: `
     <section class="page">
       <div class="page-head">
@@ -27,23 +30,12 @@ import { reformedKnowledgeBase } from './reformed-knowledge-base';
           }
         </div>
 
-        @for (item of filteredLibrary(); track item.id) {
-          <article class="support-answer">
-            <span>{{ item.category }}</span>
-            <h2>{{ item.question }}</h2>
-            <p>{{ item.answer }}</p>
-            <div>
-              <strong>Referências</strong>
-              <small>{{ item.references.join(' | ') }}</small>
-            </div>
-            @if (item.pastoralNote) {
-              <div class="pastoral-note">
-                <strong>Cuidado pastoral</strong>
-                <small>{{ item.pastoralNote }}</small>
-              </div>
-            }
-          </article>
-        }
+        <div class="unified-list support-card-list">
+          @for (item of filteredLibrary(); track item.id) {
+            <app-list-card [title]="item.question" [state]="item.category"
+              [infos]="[{ icon: 'description', text: item.answer }, { icon: 'open', text: item.references.join(' | ') }, { icon: 'volunteer', text: item.pastoralNote || '' }]" />
+          } @empty { <app-empty-state message="Nenhuma pergunta encontrada." /> }
+        </div>
       </section>
     </section>
   `

@@ -5,11 +5,14 @@ import { AuthService } from '../core/auth.service';
 import { formatDateTime } from '../core/date-format';
 import { ChildRecord, ChildrenSummary, PageResponse } from '../core/models';
 import { NotificationService } from '../core/notification.service';
+import { CompactPaginationComponent } from '../shared/compact-pagination.component';
+import { EmptyStateComponent } from '../shared/empty-state.component';
+import { ListCardComponent } from '../shared/list-card.component';
 
 @Component({
   selector: 'app-children',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ListCardComponent, EmptyStateComponent, CompactPaginationComponent],
   template: `
     <section class="page children-page">
       <div class="page-head">
@@ -119,40 +122,15 @@ import { NotificationService } from '../core/notification.service';
           </label>
         </div>
 
-        <div class="responsive-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Criança</th>
-                <th>Responsável</th>
-                <th>Idade</th>
-                <th>Atividade</th>
-                <th>Bairro</th>
-                <th>Cadastrado por</th>
-                <th>Data</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (record of records(); track record.id) {
-                <tr (click)="edit(record)">
-                  <td data-label="Criança">{{ record.childName }}</td>
-                  <td data-label="Responsável">{{ record.guardianName || '-' }}</td>
-                  <td data-label="Idade">{{ record.age ?? '-' }}</td>
-                  <td data-label="Atividade">{{ record.activityName || '-' }}</td>
-                  <td data-label="Bairro">{{ record.neighborhood || '-' }}</td>
-                  <td data-label="Cadastrado por">{{ record.responsibleUserName || '-' }}</td>
-                  <td data-label="Data">{{ formatDate(record.createdAt) }}</td>
-                </tr>
-              }
-            </tbody>
-          </table>
+        <div class="unified-list">
+          @for (record of records(); track record.id) {
+            <app-list-card [title]="record.childName" [interactive]="true" [actions]="[{ id: 'edit', label: 'Editar', icon: 'edit' }]"
+              (activate)="edit(record)" (action)="edit(record)"
+              [infos]="[{ icon: 'person', text: record.guardianName || '-' }, { icon: 'groups', text: record.age !== undefined ? record.age + ' ano(s)' : '-' }, { icon: 'service', text: record.activityName || '-' }, { icon: 'location', text: record.neighborhood || '-' }, { icon: 'volunteer', text: record.responsibleUserName || '-' }, { icon: 'calendar', text: formatDate(record.createdAt) }]" />
+          } @empty { <app-empty-state message="Nenhum cadastro infantil encontrado." /> }
         </div>
-
-        <div class="pagination">
-          <button type="button" class="secondary" [disabled]="currentPage === 0" (click)="goToPage(currentPage - 1)">Anterior</button>
-          <span>Página {{ currentPage + 1 }} de {{ page()?.pages || 1 }}</span>
-          <button type="button" class="secondary" [disabled]="currentPage + 1 >= (page()?.pages || 1)" (click)="goToPage(currentPage + 1)">Próxima</button>
-        </div>
+        <app-compact-pagination [pageIndex]="currentPage" [totalPages]="page()?.pages || 1"
+          (previous)="goToPage(currentPage - 1)" (next)="goToPage(currentPage + 1)" />
       </section>
       }
     </section>

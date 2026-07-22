@@ -6,6 +6,8 @@ import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { AppUser, Team, TeamMember, TeamType, Visit } from '../core/models';
 import { NotificationService } from '../core/notification.service';
+import { EmptyStateComponent } from '../shared/empty-state.component';
+import { ListCardComponent } from '../shared/list-card.component';
 
 const teamTypes: Array<{ value: TeamType; label: string }> = [
   { value: 'EVANGELISM', label: 'Evangelismo' },
@@ -24,7 +26,7 @@ const teamTypes: Array<{ value: TeamType; label: string }> = [
 @Component({
   selector: 'app-teams',
   standalone: true,
-  imports: [FormsModule, SlicePipe],
+  imports: [FormsModule, SlicePipe, ListCardComponent, EmptyStateComponent],
   template: `
     <section class="page">
       <div class="page-head">
@@ -72,22 +74,13 @@ const teamTypes: Array<{ value: TeamType; label: string }> = [
             <button type="submit">Salvar</button>
           </form>
 
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Equipe</th><th>Tipo</th><th>Lider</th><th>Integrantes</th></tr>
-              </thead>
-              <tbody>
-                @for (team of teams(); track team.id) {
-                  <tr (click)="selectTeam(team)" [class.selected-row]="selectedTeam()?.id === team.id">
-                    <td data-label="Equipe">{{ team.name }}</td>
-                    <td data-label="Tipo">{{ teamTypeLabel(team.teamType) }}</td>
-                    <td data-label="Lider">{{ team.leaderName || '-' }}</td>
-                    <td data-label="Integrantes">{{ membersOf(team).length }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+          <div class="table-wrap unified-list">
+            @for (team of teams(); track team.id) {
+              <app-list-card [title]="team.name" [interactive]="true" [selected]="selectedTeam()?.id === team.id"
+                [actions]="[{ id: 'view', label: 'Visualizar', icon: 'open' }, { id: 'edit', label: 'Editar', icon: 'edit' }]"
+                [infos]="[{ icon: 'service', text: teamTypeLabel(team.teamType) }, { icon: 'person', text: team.leaderName || '-' }, { icon: 'groups', text: membersOf(team).length + ' integrante(s)' }]"
+                (activate)="selectTeam(team)" (action)="handleTeamAction($event, team)" />
+            } @empty { <app-empty-state message="Nenhuma equipe encontrada." /> }
           </div>
         }
 
@@ -119,37 +112,23 @@ const teamTypes: Array<{ value: TeamType; label: string }> = [
 
             <section class="detail-section">
               <h2>Integrantes</h2>
-              @if (membersOf(team).length) {
+              <div class="unified-list">
                 @for (member of membersOf(team); track member.id) {
-                  <div class="info-row">
-                    <div>
-                      <strong>{{ member.name }}</strong>
-                      <span>{{ member.email }}</span>
-                    </div>
-                    <small>{{ memberIsLeader(member) ? 'Lider da equipe' : roleNames(member.roles) }}</small>
-                  </div>
-                }
-              } @else {
-                <p class="muted">Nenhum usuario vinculado a esta equipe.</p>
-              }
+                  <app-list-card [title]="member.name" [state]="memberIsLeader(member) ? 'Líder' : ''"
+                    [infos]="[{ icon: 'email', text: member.email }, { icon: 'status', text: memberIsLeader(member) ? 'Líder da equipe' : roleNames(member.roles) }]" />
+                } @empty { <app-empty-state message="Nenhum usuário vinculado a esta equipe." /> }
+              </div>
             </section>
 
             @if (isEvangelismTeam(team)) {
               <section class="detail-section">
                 <h2>Ultimas visitas</h2>
-                @if (teamVisits().length) {
+                <div class="unified-list">
                   @for (visit of teamVisits() | slice:0:8; track visit.id) {
-                    <div class="info-row">
-                      <div>
-                        <strong>{{ visit.personName }}</strong>
-                        <span>{{ visit.neighborhood || visit.manualAddress || visit.city }}</span>
-                      </div>
-                      <small>{{ visit.responsibleUserName || '-' }}</small>
-                    </div>
-                  }
-                } @else {
-                  <p class="muted">Nenhuma visita registrada para esta equipe.</p>
-                }
+                    <app-list-card [title]="visit.personName"
+                      [infos]="[{ icon: 'location', text: visit.neighborhood || visit.manualAddress || visit.city }, { icon: 'volunteer', text: visit.responsibleUserName || '-' }]" />
+                  } @empty { <app-empty-state message="Nenhuma visita registrada para esta equipe." /> }
+                </div>
               </section>
             } @else {
               <section class="detail-section">
@@ -231,6 +210,11 @@ export class TeamsComponent implements OnInit {
     if (this.mobileFocusedTeam()) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  }
+
+  handleTeamAction(action: string, team: Team): void {
+    if (action === 'edit') this.edit(team);
+    else this.selectTeam(team);
   }
 
   isAdmin(): boolean {

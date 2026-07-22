@@ -3,11 +3,13 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../core/api.service';
 import { Dashboard } from '../core/models';
 import { NotificationService } from '../core/notification.service';
+import { EmptyStateComponent } from '../shared/empty-state.component';
+import { ListCardComponent } from '../shared/list-card.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, ListCardComponent, EmptyStateComponent],
   template: `
     <section class="page">
       <div class="page-head">
@@ -76,20 +78,12 @@ import { NotificationService } from '../core/notification.service';
           </div>
           <div class="team-report-grid">
             @for (team of data.teamReports; track team.teamId) {
-              <article class="team-report-card">
-                <div>
-                  <h3>{{ team.teamName }}</h3>
-                  <p class="muted">{{ teamAcceptanceRate(team) }}% aceitaram receber visitas</p>
-                </div>
-                <div class="metric-grid compact">
-                  <div class="metric"><span>Casas</span><strong>{{ team.totalVisits }}</strong></div>
-                  <div class="metric"><span>Aceitam</span><strong>{{ team.wantsVisitsYes }}</strong></div>
-                  <div class="metric"><span>Nao aceitam</span><strong>{{ team.wantsVisitsNo }}</strong></div>
-                </div>
-                <button type="button" class="secondary" (click)="downloadTeamExcel(team.teamId, team.teamName)">Baixar Excel desta equipe</button>
-              </article>
+              <app-list-card [title]="team.teamName" [state]="teamAcceptanceRate(team) + '% de aceitação'"
+                [actions]="[{ id: 'download', label: 'Baixar Excel', icon: 'description' }]"
+                [infos]="[{ icon: 'home', text: team.totalVisits + ' casa(s)' }, { icon: 'status', text: team.wantsVisitsYes + ' aceitam visitas' }, { icon: 'description', text: team.wantsVisitsNo + ' não aceitam' }]"
+                (action)="downloadTeamExcel(team.teamId, team.teamName)" />
             } @empty {
-              <p class="muted">Nenhuma equipe cadastrada para exibir neste relatorio.</p>
+              <app-empty-state message="Nenhuma equipe cadastrada para exibir neste relatório." />
             }
           </div>
         </section>

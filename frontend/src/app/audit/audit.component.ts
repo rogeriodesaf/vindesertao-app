@@ -3,11 +3,14 @@ import { SlicePipe } from '@angular/common';
 import { ApiService } from '../core/api.service';
 import { formatDateTime } from '../core/date-format';
 import { AuditLog } from '../core/models';
+import { CompactPaginationComponent } from '../shared/compact-pagination.component';
+import { EmptyStateComponent } from '../shared/empty-state.component';
+import { ListCardComponent } from '../shared/list-card.component';
 
 @Component({
   selector: 'app-audit',
   standalone: true,
-  imports: [SlicePipe],
+  imports: [SlicePipe, ListCardComponent, EmptyStateComponent, CompactPaginationComponent],
   template: `
     <section class="page">
       <div class="page-head">
@@ -24,27 +27,13 @@ import { AuditLog } from '../core/models';
             <p class="muted">{{ total() }} evento(s) registrados</p>
           </div>
         </div>
-        <table>
-          <thead>
-            <tr><th>Quando</th><th>Quem fez</th><th>O que aconteceu</th><th>Area afetada</th><th>Detalhes</th></tr>
-          </thead>
-          <tbody>
-            @for (log of logs(); track log.id) {
-              <tr>
-                <td data-label="Quando">{{ formatDate(log.createdAt) }}</td>
-                <td data-label="Quem fez">{{ log.actorEmail || 'Sistema' }}</td>
-                <td data-label="O que aconteceu">{{ eventTitle(log) }}</td>
-                <td data-label="Area afetada">{{ entityLabel(log) }}</td>
-                <td data-label="Detalhes">{{ eventDetails(log) }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-        <div class="pagination">
-          <button type="button" class="secondary" [disabled]="pageIndex() === 0" (click)="previousPage()">Anterior</button>
-          <span>Pagina {{ pageIndex() + 1 }} de {{ totalPages() }}</span>
-          <button type="button" class="secondary" [disabled]="pageIndex() + 1 >= totalPages()" (click)="nextPage()">Proxima</button>
+        <div class="unified-list">
+          @for (log of logs(); track log.id) {
+            <app-list-card [title]="eventTitle(log)" [state]="entityLabel(log)"
+              [infos]="[{ icon: 'calendar', text: formatDate(log.createdAt) }, { icon: 'person', text: log.actorEmail || 'Sistema' }, { icon: 'description', text: eventDetails(log) }]" />
+          } @empty { <app-empty-state message="Nenhum evento de auditoria encontrado." /> }
         </div>
+        <app-compact-pagination [pageIndex]="pageIndex()" [totalPages]="totalPages()" (previous)="previousPage()" (next)="nextPage()" />
       </div>
     </section>
   `
