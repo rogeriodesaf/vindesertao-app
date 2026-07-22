@@ -14,6 +14,7 @@ import { OfflineVisitQueueService } from '../core/offline-visit-queue.service';
 import { EmptyStateComponent } from '../shared/empty-state.component';
 import { ListCardComponent, ListCardInfo } from '../shared/list-card.component';
 import { FormSectionComponent } from '../shared/form-section.component';
+import { DatePickerComponent } from '../shared/date-picker.component';
 
 type VisitFormSection = 'basic' | 'location' | 'photo' | 'more' | 'visits';
 type LocationSource = 'none' | 'gps' | 'map' | 'manual' | 'address';
@@ -21,7 +22,7 @@ type LocationSource = 'none' | 'gps' | 'map' | 'manual' | 'address';
 @Component({
   selector: 'app-visits',
   standalone: true,
-  imports: [FormsModule, SlicePipe, ListCardComponent, EmptyStateComponent, FormSectionComponent],
+  imports: [FormsModule, SlicePipe, ListCardComponent, EmptyStateComponent, FormSectionComponent, DatePickerComponent],
   template: `
     <div class="mobile-view-toggle" role="group" aria-label="Visualização da tela de visitas">
       <button type="button" [class.active]="mobileView() === 'form'" (click)="showMobileView('form')">Cadastro</button>
@@ -122,7 +123,7 @@ type LocationSource = 'none' | 'gps' | 'map' | 'manual' | 'address';
               <label for="visit-address">Endereço manual<textarea id="visit-address" name="manualAddress" [(ngModel)]="form.manualAddress"></textarea></label>
               <div class="form-grid"><label for="visit-age">Idade<input id="visit-age" name="personAge" type="number" min="0" [(ngModel)]="form.personAge"></label><label for="visit-household">Moradores na casa<input id="visit-household" name="householdSize" type="number" min="0" [(ngModel)]="form.householdSize"></label></div>
               <label for="visit-reference">Ponto de referência<textarea id="visit-reference" name="referencePoint" [(ngModel)]="form.referencePoint"></textarea></label>
-              <label for="visit-next">Próxima visita<input id="visit-next" name="nextVisitAt" type="datetime-local" [ngModel]="toLocalDateTime(form.nextVisitAt)" (ngModelChange)="setNextVisitAt($event)"></label>
+              <label>Próxima visita<app-date-picker name="nextVisitAt" ariaLabel="Data e horário da próxima visita" [withTime]="true" [ngModel]="toLocalDateTime(form.nextVisitAt)" (ngModelChange)="setNextVisitAt($event)" /></label>
               <label for="visit-streetview">Link do Street View<input id="visit-streetview" name="streetViewUrl" type="url" placeholder="Cole aqui o link do Google Street View" [(ngModel)]="form.streetViewUrl"></label>
               <button type="button" class="secondary" [disabled]="!hasStreetViewTarget()" (click)="openStreetView()">Ver no Street View</button>
             </app-form-section>

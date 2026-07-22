@@ -5,11 +5,12 @@ import { Dashboard } from '../core/models';
 import { NotificationService } from '../core/notification.service';
 import { EmptyStateComponent } from '../shared/empty-state.component';
 import { ListCardComponent } from '../shared/list-card.component';
+import { DateRangeFilterComponent } from '../shared/date-range-filter.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [FormsModule, ListCardComponent, EmptyStateComponent],
+  imports: [FormsModule, ListCardComponent, EmptyStateComponent, DateRangeFilterComponent],
   template: `
     <section class="page">
       <div class="page-head">
@@ -17,11 +18,7 @@ import { ListCardComponent } from '../shared/list-card.component';
           <h1>Dashboard administrativo</h1>
           <p class="muted">Resumo das fichas de visita cadastradas no período selecionado.</p>
         </div>
-        <div class="date-filters">
-          <label>Data inicial<input type="datetime-local" [(ngModel)]="from"></label>
-          <label>Data final<input type="datetime-local" [(ngModel)]="to"></label>
-          <button type="button" (click)="load()">Filtrar</button>
-        </div>
+        <app-date-range-filter [(from)]="from" [(to)]="to" valueMode="datetime" (filter)="load()" (clear)="load()" />
       </div>
 
       @if (dashboard(); as data) {

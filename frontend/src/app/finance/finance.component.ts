@@ -6,11 +6,13 @@ import { NotificationService } from '../core/notification.service';
 import { CompactPaginationComponent } from '../shared/compact-pagination.component';
 import { EmptyStateComponent } from '../shared/empty-state.component';
 import { ListCardComponent } from '../shared/list-card.component';
+import { DatePickerComponent } from '../shared/date-picker.component';
+import { DateRangeFilterComponent } from '../shared/date-range-filter.component';
 
 @Component({
   selector: 'app-finance',
   standalone: true,
-  imports: [FormsModule, ListCardComponent, EmptyStateComponent, CompactPaginationComponent],
+  imports: [FormsModule, ListCardComponent, EmptyStateComponent, CompactPaginationComponent, DatePickerComponent, DateRangeFilterComponent],
   template: `
     <section class="page">
       <div class="page-head">
@@ -18,10 +20,8 @@ import { ListCardComponent } from '../shared/list-card.component';
           <h1>Financeiro</h1>
           <p class="muted">Controle entradas, saídas e saldo do projeto.</p>
         </div>
-        <div class="date-filters">
-          <label>Data inicial<input type="date" [(ngModel)]="from"></label>
-          <label>Data final<input type="date" [(ngModel)]="to"></label>
-          <button type="button" (click)="load()">Filtrar</button>
+        <div class="page-head-actions">
+          <app-date-range-filter [(from)]="from" [(to)]="to" valueMode="date" (filter)="load()" (clear)="load()" />
           <button type="button" class="secondary" (click)="newTransaction()">Novo lançamento</button>
         </div>
       </div>
@@ -54,7 +54,7 @@ import { ListCardComponent } from '../shared/list-card.component';
                   <option value="EXPENSE">Saída</option>
                 </select>
               </label>
-              <label>Data<input type="date" name="transactionDate" [(ngModel)]="form.transactionDate" required></label>
+              <label>Data<app-date-picker name="transactionDate" ariaLabel="Data do lançamento" [(ngModel)]="form.transactionDate" [required]="true" /></label>
             </div>
             <label>Categoria
               <select name="category" [(ngModel)]="form.category" required>

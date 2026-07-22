@@ -8,11 +8,12 @@ import { NotificationService } from '../core/notification.service';
 import { CompactPaginationComponent } from '../shared/compact-pagination.component';
 import { EmptyStateComponent } from '../shared/empty-state.component';
 import { ListCardComponent } from '../shared/list-card.component';
+import { DateRangeFilterComponent } from '../shared/date-range-filter.component';
 
 @Component({
   selector: 'app-social-assistance',
   standalone: true,
-  imports: [FormsModule, ListCardComponent, EmptyStateComponent, CompactPaginationComponent],
+  imports: [FormsModule, ListCardComponent, EmptyStateComponent, CompactPaginationComponent, DateRangeFilterComponent],
   template: `
     <section class="page">
       <div class="page-head">
@@ -20,10 +21,8 @@ import { ListCardComponent } from '../shared/list-card.component';
           <h1>Ação Social</h1>
           <p class="muted">Registre atendimentos médicos, odontológicos, cortes de cabelo, manicure, cestas básicas e outros serviços.</p>
         </div>
-        <div class="date-filters">
-          <label>Data inicial<input type="datetime-local" [(ngModel)]="from"></label>
-          <label>Data final<input type="datetime-local" [(ngModel)]="to"></label>
-          <button type="button" (click)="load()">Filtrar</button>
+        <div class="page-head-actions">
+          <app-date-range-filter [(from)]="from" [(to)]="to" valueMode="datetime" (filter)="load()" (clear)="load()" />
           <button type="button" class="secondary" (click)="newRecord()">Novo atendimento</button>
         </div>
       </div>
