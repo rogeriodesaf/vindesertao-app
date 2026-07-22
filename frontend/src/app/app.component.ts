@@ -3,6 +3,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from './core/auth.service';
 import { NotificationService } from './core/notification.service';
 import { ThemeService } from './core/theme.service';
+import { AtualizacaoAppService } from './core/atualizacao-app.service';
 
 interface NavItem {
   label: string;
@@ -137,6 +138,18 @@ const icons = {
         <button type="button" class="toast-close" aria-label="Fechar mensagem" (click)="notifications.clear()">×</button>
       </div>
     }
+
+    @if (atualizacaoApp.novaVersaoDisponivel()) {
+      <aside class="app-update-notice" role="status" aria-live="polite">
+        <div>
+          <strong>Nova versão disponível</strong>
+          <span>Atualize para carregar a versão mais recente do Vinde Sertão.</span>
+        </div>
+        <button type="button" [disabled]="atualizacaoApp.atualizando()" (click)="atualizacaoApp.atualizarAgora()">
+          {{ atualizacaoApp.atualizando() ? 'Atualizando...' : 'Atualizar agora' }}
+        </button>
+      </aside>
+    }
   `
 })
 export class AppComponent {
@@ -181,7 +194,12 @@ export class AppComponent {
       .slice(0, 4);
   });
 
-  constructor(public auth: AuthService, public notifications: NotificationService, public theme: ThemeService) {}
+  constructor(
+    public auth: AuthService,
+    public notifications: NotificationService,
+    public theme: ThemeService,
+    public atualizacaoApp: AtualizacaoAppService
+  ) {}
 
   toggleMenu(): void {
     this.menuOpen.update((open) => !open);

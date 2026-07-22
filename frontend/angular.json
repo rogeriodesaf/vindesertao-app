@@ -20,14 +20,14 @@
             "tsConfig": "tsconfig.app.json",
             "assets": [
               "src/assets",
-              "src/manifest.webmanifest",
-              "src/sw.js"
+              "src/manifest.webmanifest"
             ],
             "styles": ["node_modules/leaflet/dist/leaflet.css", "src/styles.css"],
             "allowedCommonJsDependencies": ["leaflet"]
           },
           "configurations": {
             "production": {
+              "serviceWorker": "ngsw-config.json",
               "budgets": [
                 {
                   "type": "initial",
@@ -67,8 +67,7 @@
             "tsConfig": "tsconfig.spec.json",
             "assets": [
               "src/assets",
-              "src/manifest.webmanifest",
-              "src/sw.js"
+              "src/manifest.webmanifest"
             ],
             "styles": ["node_modules/leaflet/dist/leaflet.css", "src/styles.css"]
           }

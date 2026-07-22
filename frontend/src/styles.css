@@ -232,6 +232,28 @@ h2 { font-size: 17px; }
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+.app-update-notice {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1900;
+  width: min(520px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+  border-radius: 14px;
+  background: var(--color-surface-elevated);
+  color: var(--color-text);
+  box-shadow: var(--shadow-elevated);
+}
+.app-update-notice div { min-width: 0; display: grid; gap: 4px; }
+.app-update-notice strong, .app-update-notice span { overflow-wrap: anywhere; }
+.app-update-notice strong { color: var(--color-primary-readable); }
+.app-update-notice span { color: var(--color-text-secondary); font-size: 14px; }
+.app-update-notice button { min-height: 44px; white-space: nowrap; font-weight: 750; }
 .support-fab {
   position: fixed;
   right: 18px;
@@ -1021,6 +1043,13 @@ tbody tr:hover { background: var(--color-hover); }
   .session { width: 100%; }
   .session span { max-width: calc(100vw - 110px); }
   .mobile-user { display: none; }
+  .app-update-notice {
+    right: 12px;
+    bottom: calc(82px + env(safe-area-inset-bottom, 0px));
+    width: calc(100vw - 24px);
+    grid-template-columns: 1fr;
+  }
+  .app-update-notice button { width: 100%; }
   .login-page .login-panel { padding: 24px 20px; }
   .login-theme-toggle, .password-toggle { width: 48px; }
   .password-toggle { width: 44px; }
