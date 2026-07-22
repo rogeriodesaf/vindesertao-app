@@ -466,6 +466,48 @@ h2 { font-size: 17px; }
 }
 .map-panel { position: relative; min-width: 0; }
 .territory-map-panel { position: relative; min-width: 0; }
+.territory-draw-toolbar {
+  position: absolute;
+  z-index: 600;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.territory-draw-toolbar button { min-height: 44px; border-radius: 999px; pointer-events: auto; box-shadow: var(--shadow); }
+.territory-draw-toolbar .danger-button { background: var(--danger); color: #fff; }
+.territory-instruction {
+  position: absolute;
+  z-index: 590;
+  left: 50%;
+  bottom: 76px;
+  max-width: min(520px, calc(100% - 32px));
+  padding: 9px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface-elevated) 94%, transparent);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.territory-area { margin: 0; color: var(--muted); }
+.territory-map-panel.is-drawing .leaflet-container { cursor: crosshair; touch-action: none; }
+.territory-vertex-icon { background: transparent; border: 0; }
+.territory-vertex-icon span {
+  width: 24px;
+  height: 24px;
+  display: block;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: var(--territory-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
 .map-toolbar {
   position: absolute;
   z-index: 500;
@@ -1144,6 +1186,18 @@ tbody tr:hover { background: var(--color-hover); }
   .map-toolbar button, .map-toolbar .button { width: 100%; }
   .metric-grid, .analytics-grid, .profile-summary, .team-report-grid, .split, .social-layout, .social-analytics, .support-layout, .teams-layout, .territory-layout, .duplicate-grid { grid-template-columns: 1fr; }
   .territory-map { min-height: max(68vh, 560px); }
+  .territory-page { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+  .territory-draw-toolbar {
+    left: 10px;
+    right: 10px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    justify-content: stretch;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  .territory-draw-toolbar button { flex: 1 0 auto; min-width: 88px; padding: 10px 12px; }
+  .territory-instruction { bottom: calc(72px + env(safe-area-inset-bottom)); font-size: 12px; }
+  .territory-search { left: 10px; right: 10px; top: 10px; }
   .page { padding: 14px; gap: 14px; }
   .page-head, .date-filters, .report-actions { align-items: stretch; flex-direction: column; }
   .date-filters, .date-filters label, .report-actions .actions, .actions { width: 100%; }

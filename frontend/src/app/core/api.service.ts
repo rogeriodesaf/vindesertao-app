@@ -90,6 +90,10 @@ export class ApiService {
     return this.http.put<Territory>(`${environment.apiBaseUrl}/territories/${territory.id}`, territory);
   }
 
+  deleteTerritory(id: number) {
+    return this.http.delete<void>(`${environment.apiBaseUrl}/territories/${id}`);
+  }
+
   duplicateVisits() {
     return this.http.get<DuplicateVisitGroup[]>(`${environment.apiBaseUrl}/visits/duplicates`);
   }

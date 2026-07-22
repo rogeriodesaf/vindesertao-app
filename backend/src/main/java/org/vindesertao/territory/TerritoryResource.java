@@ -35,4 +35,11 @@ public class TerritoryResource {
     public TerritoryDtos.TerritoryResponse update(@PathParam("id") Long id, @Valid TerritoryDtos.TerritoryRequest request) {
         return TerritoryDtos.TerritoryResponse.from(territoryService.update(id, request));
     }
+
+    @DELETE
+    @Path("/{id}")
+    @RolesAllowed("admin")
+    public void delete(@PathParam("id") Long id) {
+        territoryService.delete(id);
+    }
 }

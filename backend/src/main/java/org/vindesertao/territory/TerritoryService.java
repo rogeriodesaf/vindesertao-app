@@ -79,6 +79,15 @@ public class TerritoryService {
         return territory;
     }
 
+    @Transactional
+    public void delete(Long id) {
+        Territory territory = territories.findByIdOptional(id)
+                .orElseThrow(() -> new NotFoundException("Territorio nao encontrado."));
+        String before = snapshot(territory);
+        territories.delete(territory);
+        auditService.log("DELETE", "TERRITORY", id, before, null);
+    }
+
     public boolean contains(Territory territory, double latitude, double longitude) {
         List<double[]> points = points(territory.polygonGeoJson);
         if (points.size() < 3) {
@@ -105,8 +114,15 @@ public class TerritoryService {
                 .orElseThrow(() -> new IllegalArgumentException("Equipe invalida."));
         territory.color = request.color();
         territory.polygonGeoJson = request.polygonGeoJson();
-        if (points(territory.polygonGeoJson).size() < 3) {
+        List<double[]> polygon = points(territory.polygonGeoJson);
+        if (polygon.size() < 4) {
             throw new IllegalArgumentException("O territorio precisa ter pelo menos 3 pontos no mapa.");
+        }
+        for (double[] point : polygon) {
+            if (!Double.isFinite(point[0]) || !Double.isFinite(point[1]) || point[0] < -90 || point[0] > 90
+                    || point[1] < -180 || point[1] > 180 || (point[0] == 0 && point[1] == 0)) {
+                throw new IllegalArgumentException("O territorio possui coordenadas invalidas.");
+            }
         }
         territory.active = request.active();
         territory.enforceForProjectists = request.enforceForProjectists();
