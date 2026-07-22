@@ -12,32 +12,63 @@ import { ThemeService } from '../core/theme.service';
   standalone: true,
   imports: [FormsModule, RouterLink],
   template: `
-    <section class="login-shell">
+    <section class="login-shell login-page">
+      <button
+        type="button"
+        class="login-theme-toggle"
+        [attr.title]="theme.label()"
+        [attr.aria-label]="theme.label()"
+        (click)="theme.cycle()"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path [attr.d]="theme.activeTheme() === 'dark' ? moonIcon : sunIcon"></path>
+        </svg>
+      </button>
+
       <form class="login-panel" (ngSubmit)="submit()">
         <div class="login-logo">
           <img src="/assets/logo-vinde-sertao.webp" alt="Vinde Sertao">
         </div>
-        <label>
+
+        <label class="login-field">
           E-mail
           <input name="email" type="email" [(ngModel)]="email" autocomplete="username" required>
         </label>
-        <div class="login-options">
-          <a routerLink="/forgot-password">Esqueci minha senha</a>
-          <button type="button" class="secondary theme-toggle compact" [attr.title]="theme.label()" (click)="theme.cycle()">
-            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path [attr.d]="theme.activeTheme() === 'dark' ? moonIcon : sunIcon"></path>
-            </svg>
-            {{ theme.label() }}
-          </button>
-        </div>
-        <label>
+
+        <label class="login-field">
           Senha
-          <input name="password" type="password" [(ngModel)]="password" autocomplete="current-password" required>
+          <span class="password-field">
+            <input
+              name="password"
+              [type]="visiblePassword() ? 'text' : 'password'"
+              [(ngModel)]="password"
+              autocomplete="current-password"
+              required
+            >
+            <button
+              type="button"
+              class="password-toggle"
+              [attr.aria-label]="visiblePassword() ? 'Ocultar senha' : 'Mostrar senha'"
+              [attr.title]="visiblePassword() ? 'Ocultar senha' : 'Mostrar senha'"
+              (click)="togglePassword()"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0Z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+                @if (visiblePassword()) {
+                  <path class="password-toggle-slash" d="M3 3 21 21"></path>
+                }
+              </svg>
+            </button>
+          </span>
         </label>
+
         @if (error()) {
           <p class="error">{{ error() }}</p>
         }
-        <button type="submit" [disabled]="loading()">{{ loading() ? 'Entrando...' : 'Entrar' }}</button>
+
+        <button type="submit" class="login-submit" [disabled]="loading()">{{ loading() ? 'Entrando...' : 'Entrar' }}</button>
+        <a class="login-forgot-link" routerLink="/forgot-password">Esqueci minha senha</a>
       </form>
     </section>
   `
@@ -49,8 +80,13 @@ export class LoginComponent {
   password = 'Admin123!';
   loading = signal(false);
   error = signal('');
+  visiblePassword = signal(false);
 
   constructor(private auth: AuthService, private router: Router, private notifications: NotificationService, public theme: ThemeService) {}
+
+  togglePassword(): void {
+    this.visiblePassword.update(visible => !visible);
+  }
 
   submit(): void {
     this.loading.set(true);
