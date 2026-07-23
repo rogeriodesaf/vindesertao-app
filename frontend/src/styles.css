@@ -973,6 +973,41 @@ tbody tr:hover { background: var(--color-hover); }
   border-radius: 8px;
   overflow: hidden;
 }
+@media (min-width: 901px) {
+  body:has(app-territories) .app-footer { display: none; }
+  app-territories .territory-page {
+    position: relative;
+    height: 100vh;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+  }
+  app-territories .page-head { display: none; }
+  app-territories .territory-layout { display: block; height: 100%; }
+  app-territories .territory-map-panel { position: absolute; inset: 0; }
+  app-territories .territory-map {
+    height: 100%;
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+  }
+  app-territories .editor,
+  app-territories .territory-layout > .detail-card {
+    position: absolute;
+    z-index: 650;
+    top: 82px;
+    width: min(320px, calc(50% - 18px));
+    max-height: calc(100vh - 172px);
+    overflow-y: auto;
+    box-shadow: var(--shadow);
+  }
+  app-territories .editor { left: 16px; }
+  app-territories .territory-layout > .detail-card { right: 16px; }
+  app-territories .territory-search {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
 .duplicate-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .support-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; align-items: start; }
 .support-warning {
