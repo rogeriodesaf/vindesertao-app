@@ -7,6 +7,8 @@ import { AuthService } from '../core/auth.service';
 import { NotificationService } from '../core/notification.service';
 import { ThemeService } from '../core/theme.service';
 
+const REMEMBERED_EMAIL_KEY = 'vinde.rememberedEmail';
+
 @Component({
   selector: 'app-login',
   standalone: true,
@@ -25,7 +27,7 @@ import { ThemeService } from '../core/theme.service';
         </svg>
       </button>
 
-      <form class="login-panel" (ngSubmit)="submit()">
+      <form class="login-panel" autocomplete="on" (ngSubmit)="submit()">
         <div class="login-logo">
           <img src="/assets/logo-vinde-sertao.webp" alt="Vinde Sertao">
         </div>
@@ -63,6 +65,11 @@ import { ThemeService } from '../core/theme.service';
           </span>
         </label>
 
+        <label class="check-row">
+          <input name="rememberEmail" type="checkbox" [(ngModel)]="rememberEmail">
+          Lembrar meu e-mail neste dispositivo
+        </label>
+
         @if (error()) {
           <p class="error">{{ error() }}</p>
         }
@@ -76,13 +83,20 @@ import { ThemeService } from '../core/theme.service';
 export class LoginComponent {
   readonly sunIcon = 'M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0Z';
   readonly moonIcon = 'M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z';
-  email = 'admin@vindesertao.local';
-  password = 'Admin123!';
+  email = '';
+  password = '';
+  rememberEmail = false;
   loading = signal(false);
   error = signal('');
   visiblePassword = signal(false);
 
-  constructor(private auth: AuthService, private router: Router, private notifications: NotificationService, public theme: ThemeService) {}
+  constructor(private auth: AuthService, private router: Router, private notifications: NotificationService, public theme: ThemeService) {
+    const rememberedEmail = localStorage.getItem(REMEMBERED_EMAIL_KEY);
+    if (rememberedEmail) {
+      this.email = rememberedEmail;
+      this.rememberEmail = true;
+    }
+  }
 
   togglePassword(): void {
     this.visiblePassword.update(visible => !visible);
@@ -92,7 +106,11 @@ export class LoginComponent {
     this.loading.set(true);
     this.error.set('');
     this.auth.login(this.email, this.password).subscribe({
-      next: () => this.router.navigateByUrl('/visits'),
+      next: () => {
+        if (this.rememberEmail) localStorage.setItem(REMEMBERED_EMAIL_KEY, this.email.trim());
+        else localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+        this.router.navigateByUrl('/visits');
+      },
       error: (response: HttpErrorResponse) => {
         const message = response.status === 401
           ? 'E-mail ou senha invalidos.'
