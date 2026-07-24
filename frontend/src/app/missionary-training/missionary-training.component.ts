@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { AuthService } from '../core/auth.service';
 
 interface MissionaryLesson {
@@ -9,6 +10,7 @@ interface MissionaryLesson {
   youtubeId: string;
 }
 
+// Fonte estática isolada para permitir a futura substituição por dados da API.
 const MISSIONARY_LESSONS: readonly MissionaryLesson[] = [
   {
     id: 1,
@@ -63,84 +65,106 @@ const MISSIONARY_LESSONS: readonly MissionaryLesson[] = [
         <div>
           <span class="eyebrow">Formação para o campo</span>
           <h1>Treinamento Missionário</h1>
-          <p class="muted">Avance pelas aulas na sequência e prepare-se para anunciar o Evangelho.</p>
+          <p class="muted">Assista às aulas sem sair do aplicativo e avance pela trilha no seu ritmo.</p>
         </div>
-        <button type="button" class="continue-button" [disabled]="!currentLesson()" (click)="continueTraining()">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"></path></svg>
-          {{ currentLesson() ? 'Continuar treinamento' : 'Treinamento concluído' }}
-        </button>
+        <div class="progress-summary" aria-label="Progresso do treinamento">
+          <strong>{{ progressPercentage() }}%</strong>
+          <span>{{ completedCount() }} de {{ lessons.length }} concluídas</span>
+        </div>
       </header>
 
-      <section class="detail-card progress-card" aria-label="Progresso do treinamento">
-        <div class="progress-copy">
-          <div>
-            <strong>{{ progressPercentage() }}%</strong>
-            <span>{{ completedCount() }} de {{ lessons.length }} aulas concluídas</span>
-          </div>
-          <span>{{ progressMessage() }}</span>
+      <section class="player-card" aria-labelledby="selected-lesson-title">
+        <div class="video-frame">
+          <iframe
+            [src]="embedUrl()"
+            [title]="'Aula ' + selectedLesson().id + ': ' + selectedLesson().title"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allowfullscreen
+          ></iframe>
         </div>
-        <div class="progress-track" role="progressbar" aria-label="Progresso" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="progressPercentage()">
-          <span [style.width.%]="progressPercentage()"></span>
+
+        <div class="selected-lesson-content">
+          <div class="lesson-heading">
+            <div>
+              <span class="lesson-number">Aula {{ selectedLesson().id }}</span>
+              <h2 id="selected-lesson-title">{{ selectedLesson().title }}</h2>
+            </div>
+            <span class="lesson-status" [class.completed]="isCompleted(selectedLesson().id)">
+              {{ isCompleted(selectedLesson().id) ? 'Concluída' : 'Em andamento' }}
+            </span>
+          </div>
+          <p>{{ selectedLesson().description }}</p>
+          <button
+            type="button"
+            class="completion-button"
+            [class.completed]="isCompleted(selectedLesson().id)"
+            (click)="toggleCompleted(selectedLesson().id)"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>
+            {{ isCompleted(selectedLesson().id) ? 'Aula concluída' : 'Marcar como concluída' }}
+          </button>
         </div>
       </section>
 
-      <section class="training-timeline" aria-label="Trilha de aulas">
-        @for (lesson of lessons; track lesson.id) {
-          <article class="lesson-step" [class.current]="isCurrent(lesson)" [class.completed]="isCompleted(lesson.id)">
-            <div class="timeline-marker" aria-hidden="true">
-              @if (isCompleted(lesson.id)) {
-                <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>
-              } @else {
-                <span>{{ lesson.id }}</span>
-              }
-            </div>
+      <section class="progress-card" aria-label="Percentual concluído">
+        <div class="progress-track" role="progressbar" aria-label="Progresso" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="progressPercentage()">
+          <span [style.width.%]="progressPercentage()"></span>
+        </div>
+        <span>{{ progressMessage() }}</span>
+      </section>
 
-            <div class="lesson-card">
-              <a class="lesson-thumbnail" [href]="lesson.videoUrl" target="_blank" rel="noopener noreferrer"
-                (click)="setLastWatched(lesson.id)" [attr.aria-label]="'Assistir à aula ' + lesson.id + ': ' + lesson.title">
-                <img [src]="thumbnailUrl(lesson)" [alt]="'Thumbnail da aula ' + lesson.id + ': ' + lesson.title" loading="lazy">
-                <span class="play-badge" aria-hidden="true">
-                  <svg viewBox="0 0 24 24"><path d="m9 7 8 5-8 5V7Z"></path></svg>
-                </span>
-              </a>
+      <section class="lesson-list-section" aria-labelledby="lesson-list-title">
+        <div class="list-heading">
+          <div>
+            <span class="eyebrow">Sequência de estudos</span>
+            <h2 id="lesson-list-title">Todas as aulas</h2>
+          </div>
+          @if (nextIncompleteLesson(); as nextLesson) {
+            <button type="button" class="secondary next-button" (click)="selectLesson(nextLesson)">
+              Ir para a próxima pendente
+            </button>
+          }
+        </div>
 
-              <div class="lesson-content">
-                <div class="lesson-heading">
-                  <div>
-                    <span class="lesson-number">Aula {{ lesson.id }}</span>
-                    <h2>{{ lesson.title }}</h2>
-                  </div>
-                  <span class="lesson-status">{{ isCompleted(lesson.id) ? 'Concluída' : isCurrent(lesson) ? 'Aula atual' : 'Pendente' }}</span>
-                </div>
-                <p>{{ lesson.description }}</p>
-                <div class="lesson-actions">
-                  <a class="button watch-button" [href]="lesson.videoUrl" target="_blank" rel="noopener noreferrer"
-                    (click)="setLastWatched(lesson.id)">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"></path></svg>
-                    Assistir
-                  </a>
-                  <button type="button" class="secondary completion-button" [class.marked]="isCompleted(lesson.id)"
-                    (click)="toggleCompleted(lesson.id)">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>
-                    {{ isCompleted(lesson.id) ? 'Concluída' : 'Marcar como concluída' }}
-                  </button>
-                </div>
-                <a class="video-link" [href]="lesson.videoUrl" target="_blank" rel="noopener noreferrer" (click)="setLastWatched(lesson.id)">
-                  {{ lesson.videoUrl }}
-                </a>
-              </div>
-            </div>
-          </article>
-        }
+        <div class="lesson-list">
+          @for (lesson of lessons; track lesson.id) {
+            <button
+              type="button"
+              class="lesson-item"
+              [class.selected]="selectedLesson().id === lesson.id"
+              [class.completed]="isCompleted(lesson.id)"
+              [attr.aria-current]="selectedLesson().id === lesson.id ? 'true' : null"
+              (click)="selectLesson(lesson)"
+            >
+              <span class="sequence-marker" aria-hidden="true">
+                @if (isCompleted(lesson.id)) {
+                  <svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"></path></svg>
+                } @else {
+                  {{ lesson.id }}
+                }
+              </span>
+              <img [src]="thumbnailUrl(lesson)" alt="" loading="lazy">
+              <span class="lesson-copy">
+                <small>Aula {{ lesson.id }}</small>
+                <strong>{{ lesson.title }}</strong>
+                <span>{{ lesson.description }}</span>
+              </span>
+              <span class="item-state">
+                {{ isCompleted(lesson.id) ? 'Concluída' : selectedLesson().id === lesson.id ? 'Reproduzindo' : 'Assistir' }}
+              </span>
+            </button>
+          }
+        </div>
       </section>
     </section>
   `,
   styles: [`
     :host { display: block; min-width: 0; }
-    .training-page { width: min(1080px, 100%); margin: 0 auto; padding-bottom: 40px; }
+    .training-page { width: min(1040px, 100%); margin: 0 auto; padding-bottom: 42px; }
     .training-head { align-items: end; }
-    .training-head > div { min-width: 0; display: grid; gap: 6px; }
-    .training-head p { max-width: 670px; margin: 0; line-height: 1.55; }
+    .training-head > div:first-child { min-width: 0; display: grid; gap: 6px; }
+    .training-head p { max-width: 680px; margin: 0; line-height: 1.55; }
     .eyebrow, .lesson-number {
       color: var(--color-accent);
       font-size: 12px;
@@ -148,12 +172,9 @@ const MISSIONARY_LESSONS: readonly MissionaryLesson[] = [
       letter-spacing: .08em;
       text-transform: uppercase;
     }
-    .continue-button, .watch-button, .completion-button { gap: 8px; font-weight: 750; }
-    .continue-button { min-height: 46px; white-space: nowrap; }
-    button:disabled { cursor: default; opacity: .7; }
     svg {
-      width: 19px;
-      height: 19px;
+      width: 20px;
+      height: 20px;
       flex: 0 0 auto;
       fill: none;
       stroke: currentColor;
@@ -161,15 +182,56 @@ const MISSIONARY_LESSONS: readonly MissionaryLesson[] = [
       stroke-linecap: round;
       stroke-linejoin: round;
     }
-    .progress-card {
-      gap: 12px;
-      border-left: 5px solid var(--color-accent);
-      background: linear-gradient(115deg, color-mix(in srgb, var(--color-primary) 9%, transparent), transparent 55%), var(--panel);
+    .progress-summary {
+      flex: 0 0 auto;
+      display: grid;
+      justify-items: end;
+      gap: 2px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
     }
-    .progress-copy, .progress-copy > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .progress-copy > div { justify-content: flex-start; }
-    .progress-copy strong { color: var(--color-primary-readable); font-size: 28px; }
-    .progress-copy span { color: var(--muted); font-size: 13px; }
+    .progress-summary strong { color: var(--color-primary-readable); font-size: 25px; line-height: 1; }
+    .progress-summary span { color: var(--muted); font-size: 12px; }
+    .player-card {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .video-frame { width: 100%; aspect-ratio: 16 / 9; background: #0b1115; }
+    .video-frame iframe { width: 100%; height: 100%; display: block; border: 0; }
+    .selected-lesson-content { display: grid; gap: 13px; padding: 20px; }
+    .lesson-heading { min-width: 0; display: flex; align-items: start; justify-content: space-between; gap: 14px; }
+    .lesson-heading > div { min-width: 0; display: grid; gap: 4px; }
+    .lesson-heading h2 { font-size: 22px; line-height: 1.28; }
+    .selected-lesson-content p { margin: 0; color: var(--muted); line-height: 1.55; }
+    .lesson-status, .item-state {
+      flex: 0 0 auto;
+      padding: 5px 9px;
+      border: 1px solid color-mix(in srgb, var(--color-accent) 45%, var(--line));
+      border-radius: 999px;
+      background: var(--color-warning-surface);
+      color: var(--color-warning);
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .lesson-status.completed {
+      border-color: color-mix(in srgb, var(--color-success) 48%, var(--line));
+      background: var(--color-success-surface);
+      color: var(--color-success);
+    }
+    .completion-button { width: max-content; min-height: 44px; gap: 8px; font-weight: 780; }
+    .completion-button.completed {
+      border: 1px solid color-mix(in srgb, var(--color-success) 55%, var(--line));
+      background: var(--color-success-surface);
+      color: var(--color-success);
+    }
+    .progress-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; }
+    .progress-card > span { color: var(--muted); font-size: 13px; }
     .progress-track { height: 10px; overflow: hidden; border-radius: 999px; background: var(--color-hover); }
     .progress-track span {
       display: block;
@@ -178,202 +240,123 @@ const MISSIONARY_LESSONS: readonly MissionaryLesson[] = [
       background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
       transition: width 220ms ease;
     }
-    .training-timeline { position: relative; display: grid; gap: 18px; }
-    .training-timeline::before {
-      content: '';
-      position: absolute;
-      top: 28px;
-      bottom: 28px;
-      left: 23px;
-      width: 2px;
-      background: var(--line);
-    }
-    .lesson-step {
-      position: relative;
-      display: grid;
-      grid-template-columns: 48px minmax(0, 1fr);
-      gap: 16px;
-      align-items: start;
+    .lesson-list-section { display: grid; gap: 12px; }
+    .list-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
+    .list-heading > div { display: grid; gap: 4px; }
+    .next-button { min-height: 38px; font-weight: 700; }
+    .lesson-list { display: grid; gap: 9px; }
+    .lesson-item {
+      width: 100%;
       min-width: 0;
+      min-height: 96px;
+      display: grid;
+      grid-template-columns: 38px 126px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 13px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      color: var(--text);
+      text-align: left;
+      box-shadow: none;
     }
-    .timeline-marker {
-      z-index: 1;
-      width: 48px;
-      height: 48px;
+    .lesson-item:hover { border-color: var(--color-primary); background: var(--color-hover); }
+    .lesson-item.selected {
+      border-color: var(--color-accent);
+      background: color-mix(in srgb, var(--color-warning-surface) 64%, var(--panel));
+      box-shadow: 0 8px 20px color-mix(in srgb, var(--color-accent) 14%, transparent);
+    }
+    .lesson-item.completed { border-left: 4px solid var(--color-success); }
+    .sequence-marker {
+      width: 34px;
+      height: 34px;
       display: grid;
       place-items: center;
       border: 2px solid var(--line);
       border-radius: 999px;
-      background: var(--color-surface);
       color: var(--muted);
-      font-weight: 850;
-      box-shadow: 0 0 0 6px var(--color-background);
-    }
-    .timeline-marker svg { width: 22px; height: 22px; }
-    .lesson-step.current .timeline-marker {
-      border-color: var(--color-accent);
-      background: var(--color-warning-surface);
-      color: var(--color-warning);
-    }
-    .lesson-step.completed .timeline-marker { border-color: var(--color-success); background: var(--color-success); color: #fff; }
-    .lesson-card {
-      min-width: 0;
-      display: grid;
-      grid-template-columns: minmax(220px, 34%) minmax(0, 1fr);
-      overflow: hidden;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: var(--panel);
-      box-shadow: 0 8px 24px color-mix(in srgb, var(--color-background) 55%, transparent);
-      transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
-    }
-    .lesson-step.current .lesson-card {
-      border-color: var(--color-accent);
-      box-shadow: 0 12px 30px color-mix(in srgb, var(--color-accent) 18%, transparent);
-      transform: translateY(-1px);
-    }
-    .lesson-step.completed .lesson-card { border-color: color-mix(in srgb, var(--color-success) 55%, var(--line)); }
-    .lesson-thumbnail { position: relative; min-height: 190px; overflow: hidden; background: var(--color-hover); }
-    .lesson-thumbnail img {
-      width: 100%;
-      height: 100%;
-      display: block;
-      object-fit: cover;
-      transition: transform 180ms ease;
-    }
-    .lesson-thumbnail:hover img { transform: scale(1.035); }
-    .lesson-thumbnail::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, transparent 40%, rgba(17, 24, 39, .42));
-    }
-    .play-badge {
-      position: absolute;
-      z-index: 1;
-      left: 50%;
-      top: 50%;
-      width: 50px;
-      height: 50px;
-      display: grid;
-      place-items: center;
-      border: 2px solid rgba(255, 255, 255, .88);
-      border-radius: 999px;
-      background: rgba(22, 58, 70, .88);
-      color: #fff;
-      box-shadow: 0 8px 24px rgba(17, 24, 39, .3);
-      transform: translate(-50%, -50%);
-    }
-    .play-badge svg, .watch-button svg { margin-left: 2px; fill: currentColor; stroke: none; }
-    .lesson-content { min-width: 0; display: grid; align-content: center; gap: 12px; padding: 18px; }
-    .lesson-heading { min-width: 0; display: flex; align-items: start; justify-content: space-between; gap: 12px; }
-    .lesson-heading > div { min-width: 0; display: grid; gap: 4px; }
-    .lesson-heading h2 { font-size: 19px; line-height: 1.28; }
-    .lesson-status {
-      flex: 0 0 auto;
-      padding: 5px 9px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      background: var(--color-hover);
-      color: var(--muted);
-      font-size: 11px;
-      font-weight: 800;
-    }
-    .current .lesson-status {
-      border-color: color-mix(in srgb, var(--color-accent) 50%, var(--line));
-      background: var(--color-warning-surface);
-      color: var(--color-warning);
-    }
-    .completed .lesson-status {
-      border-color: color-mix(in srgb, var(--color-success) 50%, var(--line));
-      background: var(--color-success-surface);
-      color: var(--color-success);
-    }
-    .lesson-content p { margin: 0; color: var(--muted); line-height: 1.5; }
-    .lesson-actions { display: flex; gap: 9px; flex-wrap: wrap; }
-    .watch-button { min-height: 40px; }
-    .completion-button.marked {
-      border-color: color-mix(in srgb, var(--color-success) 55%, var(--line));
-      background: var(--color-success-surface);
-      color: var(--color-success);
-    }
-    .video-link {
-      min-width: 0;
-      overflow: hidden;
-      color: var(--color-primary-readable);
       font-size: 12px;
-      text-decoration: underline;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      font-weight: 850;
     }
-    @media (max-width: 760px) {
-      .training-head { align-items: stretch; flex-direction: column; }
-      .continue-button { align-self: stretch; }
-      .lesson-card { grid-template-columns: 1fr; }
-      .lesson-thumbnail { min-height: 0; aspect-ratio: 16 / 9; }
+    .completed .sequence-marker { border-color: var(--color-success); background: var(--color-success); color: #fff; }
+    .sequence-marker svg { width: 18px; height: 18px; }
+    .lesson-item img { width: 126px; aspect-ratio: 16 / 9; display: block; object-fit: cover; border-radius: 7px; }
+    .lesson-copy { min-width: 0; display: grid; gap: 3px; }
+    .lesson-copy small { color: var(--color-accent); font-size: 11px; font-weight: 850; text-transform: uppercase; }
+    .lesson-copy strong { overflow: hidden; color: var(--text); font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+    .lesson-copy > span { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .lesson-item.completed .item-state {
+      border-color: color-mix(in srgb, var(--color-success) 48%, var(--line));
+      background: var(--color-success-surface);
+      color: var(--color-success);
+    }
+    @media (max-width: 700px) {
+      .training-head { align-items: stretch; }
+      .progress-summary { justify-items: start; }
+      .progress-card { grid-template-columns: 1fr; }
+      .lesson-item { grid-template-columns: 34px 94px minmax(0, 1fr); }
+      .lesson-item img { width: 94px; }
+      .item-state { grid-column: 3; width: max-content; }
     }
     @media (max-width: 520px) {
       .training-page { gap: 15px; padding: 16px 12px 34px; }
-      .progress-copy { align-items: start; flex-direction: column; }
-      .training-timeline { gap: 14px; }
-      .training-timeline::before { left: 17px; }
-      .lesson-step { grid-template-columns: 36px minmax(0, 1fr); gap: 10px; }
-      .timeline-marker {
-        width: 36px;
-        height: 36px;
-        box-shadow: 0 0 0 4px var(--color-background);
-        font-size: 12px;
-      }
-      .timeline-marker svg { width: 18px; height: 18px; }
-      .lesson-content { gap: 10px; padding: 14px; }
+      .selected-lesson-content { gap: 11px; padding: 15px; }
       .lesson-heading { display: grid; }
       .lesson-status { width: max-content; }
-      .lesson-actions { display: grid; grid-template-columns: 1fr; }
-      .lesson-actions .button, .lesson-actions button { width: 100%; }
+      .completion-button { width: 100%; }
+      .list-heading { align-items: stretch; flex-direction: column; }
+      .next-button { width: 100%; }
+      .lesson-item { min-height: 88px; grid-template-columns: 30px 78px minmax(0, 1fr); gap: 9px; padding: 8px; }
+      .sequence-marker { width: 30px; height: 30px; }
+      .lesson-item img { width: 78px; }
+      .lesson-copy > span { display: none; }
+      .lesson-copy strong { white-space: normal; }
+      .item-state { grid-column: 3; padding: 3px 7px; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .progress-track span, .lesson-card, .lesson-thumbnail img { transition: none; }
+      .progress-track span { transition: none; }
     }
   `]
 })
 export class MissionaryTrainingComponent {
   private readonly auth = inject(AuthService);
+  private readonly sanitizer = inject(DomSanitizer);
   readonly lessons = MISSIONARY_LESSONS;
   readonly completedLessonIds = signal<number[]>(this.readProgress());
+  readonly selectedLessonId = signal(this.readInitialLessonId());
+
   readonly completedCount = computed(() => this.completedLessonIds().length);
   readonly progressPercentage = computed(() => Math.round((this.completedCount() / this.lessons.length) * 100));
-  readonly currentLesson = computed(() => this.lessons.find((lesson) => !this.isCompleted(lesson.id)) ?? null);
+  readonly selectedLesson = computed(() =>
+    this.lessons.find((lesson) => lesson.id === this.selectedLessonId()) ?? this.lessons[0]
+  );
+  readonly nextIncompleteLesson = computed(() =>
+    this.lessons.find((lesson) => !this.isCompleted(lesson.id)) ?? null
+  );
+  readonly embedUrl = computed<SafeResourceUrl>(() =>
+    this.sanitizer.bypassSecurityTrustResourceUrl(
+      `https://www.youtube-nocookie.com/embed/${this.selectedLesson().youtubeId}?rel=0&modestbranding=1`
+    )
+  );
   readonly progressMessage = computed(() => {
     if (this.completedCount() === this.lessons.length) {
-      return 'Trilha concluída. Você está pronto para revisar as aulas quando quiser.';
+      return 'Trilha concluída. Você pode rever qualquer aula.';
     }
-    if (this.completedCount() === 0) {
-      return 'Comece pela primeira aula e avance no seu ritmo.';
-    }
-    return 'Continue avançando: sua próxima aula já está destacada.';
+    return 'Seu progresso é salvo automaticamente neste dispositivo.';
   });
 
   isCompleted(lessonId: number): boolean {
     return this.completedLessonIds().includes(lessonId);
   }
 
-  isCurrent(lesson: MissionaryLesson): boolean {
-    return this.currentLesson()?.id === lesson.id;
-  }
-
   thumbnailUrl(lesson: MissionaryLesson): string {
-    return `https://img.youtube.com/vi/${lesson.youtubeId}/hqdefault.jpg`;
+    return `https://img.youtube.com/vi/${lesson.youtubeId}/mqdefault.jpg`;
   }
 
-  continueTraining(): void {
-    const lesson = this.currentLesson();
-    if (lesson) {
-      this.openLesson(lesson);
-    }
-  }
-
-  setLastWatched(lessonId: number): void {
-    localStorage.setItem(`${this.storageKey()}.lastWatched`, String(lessonId));
+  selectLesson(lesson: MissionaryLesson): void {
+    this.selectedLessonId.set(lesson.id);
+    localStorage.setItem(this.lastWatchedStorageKey(), String(lesson.id));
   }
 
   toggleCompleted(lessonId: number): void {
@@ -385,17 +368,12 @@ export class MissionaryTrainingComponent {
     }
     const nextProgress = this.lessons.map((lesson) => lesson.id).filter((id) => completed.has(id));
     this.completedLessonIds.set(nextProgress);
-    localStorage.setItem(this.storageKey(), JSON.stringify(nextProgress));
-  }
-
-  private openLesson(lesson: MissionaryLesson): void {
-    this.setLastWatched(lesson.id);
-    window.open(lesson.videoUrl, '_blank', 'noopener,noreferrer');
+    localStorage.setItem(this.progressStorageKey(), JSON.stringify(nextProgress));
   }
 
   private readProgress(): number[] {
     try {
-      const stored = JSON.parse(localStorage.getItem(this.storageKey()) || '[]');
+      const stored = JSON.parse(localStorage.getItem(this.progressStorageKey()) || '[]');
       if (!Array.isArray(stored)) {
         return [];
       }
@@ -406,7 +384,19 @@ export class MissionaryTrainingComponent {
     }
   }
 
-  private storageKey(): string {
+  private readInitialLessonId(): number {
+    const storedId = Number(localStorage.getItem(this.lastWatchedStorageKey()));
+    if (this.lessons.some((lesson) => lesson.id === storedId)) {
+      return storedId;
+    }
+    return this.lessons.find((lesson) => !this.isCompleted(lesson.id))?.id ?? this.lessons[0].id;
+  }
+
+  private progressStorageKey(): string {
     return `vinde.missionaryTraining.completed.${this.auth.user()?.id ?? 'anonymous'}`;
+  }
+
+  private lastWatchedStorageKey(): string {
+    return `${this.progressStorageKey()}.lastWatched`;
   }
 }
