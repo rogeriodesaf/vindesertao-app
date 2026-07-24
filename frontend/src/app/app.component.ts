@@ -22,6 +22,7 @@ const icons = {
   chart: 'M5 19V9m7 10V5m7 14v-7M3 19h18',
   heart: 'M12 20s-8-4.7-8-10a4.5 4.5 0 0 1 8-2.5A4.5 4.5 0 0 1 20 10c0 5.3-8 10-8 10Z',
   help: 'M12 18h.01M9.1 9a3 3 0 1 1 4.6 2.5c-1 .7-1.7 1.2-1.7 2.5M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z',
+  training: 'M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Zm0 0v16M9 8h7m-7 4h7',
   money: 'M4 6h16v12H4V6Zm3 3h.01M17 15h.01M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
   child: 'M12 7a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-6 15v-5a6 6 0 0 1 12 0v5M8 13l-3-2m11 2 3-2',
   team: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87m-1-11.26a4 4 0 0 1 0 7.75',
@@ -173,7 +174,8 @@ export class AppComponent {
     return [
       { label: 'Campo', items: [
         this.item('Visitas e mapa', 'Visitas', '/visits', icons.map),
-        this.item('Apoio evangelístico', 'Apoio', '/evangelistic-support', icons.help)
+        this.item('Apoio evangelístico', 'Apoio', '/evangelistic-support', icons.help),
+        this.item('Treinamento Missionário', 'Treinamento', '/missionary-training', icons.training)
       ] },
       { label: 'Departamentos', items: [
         this.item('Ação Social', 'Social', '/social-assistance', icons.heart),

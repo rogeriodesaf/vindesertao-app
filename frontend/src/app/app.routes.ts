@@ -14,6 +14,7 @@ import { FinanceComponent } from './finance/finance.component';
 import { ChildrenComponent } from './children/children.component';
 import { EvangelisticSupportComponent } from './evangelistic-support/evangelistic-support.component';
 import { PasswordRecoveryComponent } from './auth/password-recovery.component';
+import { MissionaryTrainingComponent } from './missionary-training/missionary-training.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -24,6 +25,7 @@ export const routes: Routes = [
   { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard], data: { canViewReports: true } },
   { path: 'social-assistance', component: SocialAssistanceComponent, canActivate: [authGuard], data: { roles: ['admin', 'lider', 'projetista'] } },
   { path: 'evangelistic-support', component: EvangelisticSupportComponent, canActivate: [authGuard], data: { roles: ['admin', 'lider', 'projetista'] } },
+  { path: 'missionary-training', component: MissionaryTrainingComponent, canActivate: [authGuard] },
   { path: 'finance', component: FinanceComponent, canActivate: [authGuard], data: { canAccessFinance: true } },
   { path: 'children', component: ChildrenComponent, canActivate: [authGuard], data: { canAccessChildren: true } },
   { path: 'teams', component: TeamsComponent, canActivate: [authGuard], data: { roles: ['admin', 'lider', 'projetista'] } },
