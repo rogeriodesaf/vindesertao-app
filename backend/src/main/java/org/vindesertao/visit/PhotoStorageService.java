@@ -22,9 +22,9 @@ public class PhotoStorageService {
 
     public PhotoStorageService() {
         this(
-                environment("CLOUDINARY_CLOUD_NAME"),
-                environment("CLOUDINARY_API_KEY"),
-                environment("CLOUDINARY_API_SECRET"),
+                credentialEnvironment("CLOUDINARY_CLOUD_NAME"),
+                credentialEnvironment("CLOUDINARY_API_KEY"),
+                credentialEnvironment("CLOUDINARY_API_SECRET"),
                 environment("CLOUDINARY_FOLDER")
         );
     }
@@ -98,6 +98,22 @@ public class PhotoStorageService {
 
     private static String environment(String name) {
         return System.getenv(name);
+    }
+
+    private static String credentialEnvironment(String name) {
+        String value = environment(name);
+        boolean present = value != null && !value.isEmpty();
+        boolean edgeWhitespace = present
+                && (Character.isWhitespace(value.charAt(0))
+                || Character.isWhitespace(value.charAt(value.length() - 1)));
+        boolean edgeQuotes = present
+                && (value.startsWith("\"") || value.endsWith("\"")
+                || value.startsWith("'") || value.endsWith("'"));
+        LOG.infof(
+                "Cloudinary config %s: presente=%s, tamanho=%d, espaco_na_extremidade=%s, aspas_na_extremidade=%s",
+                name, present, present ? value.length() : 0, edgeWhitespace, edgeQuotes
+        );
+        return value;
     }
 
     private static boolean present(String value) {
