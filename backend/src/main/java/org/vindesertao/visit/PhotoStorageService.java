@@ -1,130 +1,124 @@
 package org.vindesertao.visit;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.util.HexFormat;
-import java.util.Optional;
-import java.util.TreeMap;
+import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @ApplicationScoped
 public class PhotoStorageService {
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private static final String DEFAULT_FOLDER = "vinde-sertao/visitas";
 
-    @ConfigProperty(name = "app.cloudinary.cloud-name")
-    Optional<String> cloudName;
+    private final boolean enabled;
+    private final String folder;
+    private final UploadClient uploadClient;
 
-    @ConfigProperty(name = "app.cloudinary.api-key")
-    Optional<String> apiKey;
-
-    @ConfigProperty(name = "app.cloudinary.api-secret")
-    Optional<String> apiSecret;
-
-    @ConfigProperty(name = "app.cloudinary.folder")
-    String folder;
-
-    @Inject
-    ObjectMapper mapper;
-
-    public boolean cloudinaryEnabled() {
-        return present(cloudName) && present(apiKey) && present(apiSecret);
+    public PhotoStorageService() {
+        this(
+                environment("CLOUDINARY_CLOUD_NAME"),
+                environment("CLOUDINARY_API_KEY"),
+                environment("CLOUDINARY_API_SECRET"),
+                environment("CLOUDINARY_FOLDER")
+        );
     }
 
-    public StoredPhoto upload(String dataUrl, String fileName) {
+    PhotoStorageService(String cloudName, String apiKey, String apiSecret, String folder) {
+        this(cloudName, apiKey, apiSecret, folder, cloudinaryClient(cloudName, apiKey, apiSecret));
+    }
+
+    PhotoStorageService(String cloudName, String apiKey, String apiSecret, String folder, UploadClient uploadClient) {
+        this.enabled = present(cloudName) && present(apiKey) && present(apiSecret);
+        this.folder = present(folder) ? folder.trim() : DEFAULT_FOLDER;
+        this.uploadClient = uploadClient;
+    }
+
+    public boolean cloudinaryEnabled() {
+        return enabled;
+    }
+
+    public StoredPhoto upload(String photoData, String fileName) {
         if (!cloudinaryEnabled()) {
-            return StoredPhoto.local(dataUrl);
+            return StoredPhoto.local(photoData);
         }
 
-        long timestamp = Instant.now().getEpochSecond();
-        TreeMap<String, String> signatureParams = new TreeMap<>();
-        signatureParams.put("folder", folder);
-        signatureParams.put("timestamp", String.valueOf(timestamp));
-
-        String signature = signature(signatureParams);
-        String body = form(
-                "file", dataUrl,
-                "api_key", apiKey.orElseThrow(),
-                "timestamp", String.valueOf(timestamp),
-                "folder", folder,
-                "signature", signature
-        );
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://api.cloudinary.com/v1_1/" + encodePath(cloudName.orElseThrow()) + "/image/upload"))
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .POST(HttpRequest.BodyPublishers.ofString(body))
-                .build();
+        byte[] image = decode(photoData);
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("timestamp", Instant.now().getEpochSecond());
+        parameters.put("folder", folder);
+        parameters.put("resource_type", "image");
 
         try {
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                throw new IllegalStateException("Cloudinary recusou o upload da foto: " + response.body());
-            }
-            var json = mapper.readTree(response.body());
-            String url = json.path("secure_url").asText(null);
-            String publicId = json.path("public_id").asText(null);
-            if (url == null || url.isBlank()) {
-                throw new IllegalStateException("Cloudinary nao retornou a URL da foto.");
+            Map<?, ?> result = uploadClient.upload(image, parameters);
+            String url = text(result.get("secure_url"));
+            String publicId = text(result.get("public_id"));
+            if (!present(url)) {
+                throw new IllegalStateException("Cloudinary nao retornou a secure_url da foto.");
             }
             return new StoredPhoto(url, publicId, null);
         } catch (IOException exception) {
-            throw new IllegalStateException("Nao foi possivel enviar a foto para o Cloudinary.", exception);
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Upload da foto interrompido.", exception);
+            throw new IllegalStateException("Nao foi possivel enviar a foto para o Cloudinary: " + exception.getMessage(), exception);
         }
     }
 
-    private String signature(TreeMap<String, String> params) {
-        StringBuilder payload = new StringBuilder();
-        params.forEach((key, value) -> {
-            if (!payload.isEmpty()) {
-                payload.append('&');
-            }
-            payload.append(key).append('=').append(value);
-        });
-        payload.append(apiSecret.orElseThrow());
+    private byte[] decode(String photoData) {
+        if (!present(photoData)) {
+            throw new IllegalArgumentException("A foto enviada esta vazia.");
+        }
+        String encoded = photoData.trim();
+        int separator = encoded.indexOf(',');
+        if (encoded.startsWith("data:") && separator >= 0) {
+            encoded = encoded.substring(separator + 1);
+        }
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-1");
-            return HexFormat.of().formatHex(digest.digest(payload.toString().getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-1 indisponivel para assinar upload.", exception);
+            return Base64.getMimeDecoder().decode(encoded);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("A foto enviada nao possui Base64 valido.", exception);
         }
     }
 
-    private String form(String... entries) {
-        StringBuilder body = new StringBuilder();
-        for (int index = 0; index < entries.length; index += 2) {
-            if (!body.isEmpty()) {
-                body.append('&');
-            }
-            body.append(url(entries[index])).append('=').append(url(entries[index + 1]));
+    private static UploadClient cloudinaryClient(String cloudName, String apiKey, String apiSecret) {
+        if (!present(cloudName) || !present(apiKey) || !present(apiSecret)) {
+            return (image, parameters) -> Map.of();
         }
-        return body.toString();
+        Cloudinary cloudinary = new Cloudinary(ObjectUtils.asMap(
+                "cloud_name", credential(cloudName),
+                "api_key", credential(apiKey),
+                "api_secret", credential(apiSecret),
+                "secure", true
+        ));
+        return (image, parameters) -> cloudinary.uploader().upload(image, parameters);
     }
 
-    private String url(String value) {
-        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+    private static String environment(String name) {
+        return System.getenv(name);
     }
 
-    private String encodePath(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
+    private static boolean present(String value) {
+        return value != null && !value.isBlank();
     }
 
-    private boolean present(Optional<String> value) {
-        return value.isPresent() && !value.orElse("").isBlank();
+    private static String credential(String value) {
+        String normalized = value.trim();
+        if (normalized.length() >= 2
+                && ((normalized.startsWith("\"") && normalized.endsWith("\""))
+                || (normalized.startsWith("'") && normalized.endsWith("'")))) {
+            normalized = normalized.substring(1, normalized.length() - 1).trim();
+        }
+        return normalized;
+    }
+
+    private static String text(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    @FunctionalInterface
+    interface UploadClient {
+        Map<?, ?> upload(byte[] image, Map<String, Object> parameters) throws IOException;
     }
 
     public record StoredPhoto(String url, String publicId, String localData) {

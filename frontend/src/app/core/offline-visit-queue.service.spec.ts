@@ -125,6 +125,42 @@ describe('OfflineVisitQueueService sync', () => {
 
     expect(await successfulSync).toEqual({ sent: 1, failed: 0 });
     expect(await service.all()).toEqual([]);
+
+    expect(await service.sync()).toEqual({ sent: 0, failed: 0 });
+  });
+
+  it('synchronizes JPEG and PNG photos once and does not repeat after success', async () => {
+    await service.enqueue({
+      personName: 'Foto JPEG',
+      city: 'Sertao',
+      wantsVisits: true,
+      photoData: 'data:image/jpeg;base64,/9j/2Q==',
+      photoContentType: 'image/jpeg',
+      photoFileName: 'foto.jpg'
+    });
+    await service.enqueue({
+      personName: 'Foto PNG',
+      city: 'Sertao',
+      wantsVisits: true,
+      photoData: 'data:image/png;base64,iVBORw0KGgo=',
+      photoContentType: 'image/png',
+      photoFileName: 'foto.png'
+    });
+
+    const sync = service.sync();
+    await waitForRequest();
+    const jpeg = http.expectOne(endpoint);
+    expect(jpeg.request.body.photoData).toBe('data:image/jpeg;base64,/9j/2Q==');
+    jpeg.flush({ id: 201, personName: 'Foto JPEG', city: 'Sertao', wantsVisits: true });
+
+    await waitForRequest();
+    const png = http.expectOne(endpoint);
+    expect(png.request.body.photoData).toBe('data:image/png;base64,iVBORw0KGgo=');
+    png.flush({ id: 202, personName: 'Foto PNG', city: 'Sertao', wantsVisits: true });
+
+    expect(await sync).toEqual({ sent: 2, failed: 0 });
+    expect(await service.all()).toEqual([]);
+    expect(await service.sync()).toEqual({ sent: 0, failed: 0 });
   });
 });
 
