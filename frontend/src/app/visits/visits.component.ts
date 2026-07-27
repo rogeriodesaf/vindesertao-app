@@ -10,7 +10,7 @@ import { finalize } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { formatDateTime } from '../core/date-format';
-import { missionCityMap } from '../core/mission-city.config';
+import { missionCityMap, missionCityMaps, MissionCityMapProfile } from '../core/mission-city.config';
 import { Territory, Visit } from '../core/models';
 import { NotificationService } from '../core/notification.service';
 import { OfflineMapCacheService } from '../core/offline-map-cache.service';
@@ -282,7 +282,9 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   private refreshHandle?: ReturnType<typeof setInterval>;
   private mapTileWarningShown = false;
   private offlineMapNoticeShown = false;
-  private missionCityBounds = L.latLngBounds(missionCityMap.bounds);
+  private missionAreaBounds = L.latLngBounds(
+    missionCityMaps.flatMap(city => [city.bounds[0], city.bounds[1]])
+  );
   private photoBlobUrls = new WeakMap<Blob, string>();
   private createdPhotoUrls = new Set<string>();
 
@@ -314,11 +316,11 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       zoomControl: false,
       minZoom: missionCityMap.minZoom,
       maxZoom: missionCityMap.maxZoom,
-      maxBounds: missionCityMap.bounds,
+      maxBounds: this.missionAreaBounds,
       maxBoundsViscosity: 0.9
     }).setView(missionCityMap.center, missionCityMap.initialZoom);
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
-    this.addOfflineCityLayer();
+    missionCityMaps.forEach(city => this.addOfflineCityLayer(city));
     this.territoryLayer.addTo(this.map);
     this.visitLayer.addTo(this.map);
     this.map.on('click', (event: L.LeafletMouseEvent) => {
@@ -333,28 +335,28 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.renderMarkers(this.visits());
   }
 
-  private async addOfflineCityLayer(): Promise<void> {
+  private async addOfflineCityLayer(city: MissionCityMapProfile): Promise<void> {
     if (!this.map) {
       return;
     }
     try {
-      const response = await fetch(missionCityMap.mapArchiveUrl);
+      const response = await fetch(city.mapArchiveUrl);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
       const archive = new File(
         [await response.blob()],
-        `${missionCityMap.id}-${missionCityMap.mapDataVersion}.pmtiles`,
+        `${city.id}-${city.mapDataVersion}.pmtiles`,
         { type: 'application/vnd.pmtiles' }
       );
       const offlineCityLayer = leafletLayer({
         url: new PMTiles(new FileSource(archive)),
         flavor: 'light',
         lang: 'pt',
-        bounds: missionCityMap.bounds,
-        minZoom: missionCityMap.minZoom,
-        maxZoom: missionCityMap.maxZoom,
-        maxDataZoom: missionCityMap.maxDataZoom,
+        bounds: city.bounds,
+        minZoom: city.minZoom,
+        maxZoom: city.maxZoom,
+        maxDataZoom: city.maxDataZoom,
         noWrap: true,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | <a href="https://protomaps.com">Protomaps</a>'
       });
@@ -362,7 +364,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     } catch {
       if (!this.mapTileWarningShown) {
         this.mapTileWarningShown = true;
-        this.notifications.info(`O mapa offline de ${missionCityMap.name} não pôde carregar completamente.`);
+        this.notifications.info(`O mapa offline de ${city.name} não pôde carregar completamente.`);
       }
     }
   }
@@ -458,7 +460,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   private showOfflineMapNotice(): void {
     if (!this.offlineMapNoticeShown) {
       this.offlineMapNoticeShown = true;
-      this.notifications.info(`Exibindo a última cópia salva do mapa de ${missionCityMap.name}.`);
+      this.notifications.info('Exibindo a última cópia salva das visitas no mapa.');
     }
   }
 
@@ -466,14 +468,15 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     if (!this.searchText.trim()) {
       return;
     }
-    if (this.isMissionCitySearch(this.searchText)) {
-      this.centerMissionCity();
-      this.message.set(`Mapa de ${missionCityMap.name} centralizado.`);
+    const offlineCity = this.findMissionCityBySearch(this.searchText);
+    if (offlineCity) {
+      this.centerMissionCity(offlineCity);
+      this.message.set(`Mapa de ${offlineCity.name} centralizado.`);
       this.notifications.info(this.message());
       return;
     }
     if (!this.online()) {
-      this.notifications.info(`A busca de ruas precisa de internet. O mapa de ${missionCityMap.name} continua disponível offline.`);
+      this.notifications.info('A busca de ruas precisa de internet. Os mapas de Rio Tinto e João Pessoa continuam disponíveis offline.');
       return;
     }
     if (this.searchingAddress()) {
@@ -653,12 +656,13 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     navigator.geolocation.getCurrentPosition(
       position => this.zone.run(() => {
         const point: L.LatLngTuple = [position.coords.latitude, position.coords.longitude];
-        if (!this.missionCityBounds.contains(point)) {
+        const currentCity = this.findMissionCityByPoint(point);
+        if (!currentCity) {
           this.userCoordinates = undefined;
           this.userLocationMarker?.remove();
           this.userLocationMarker = undefined;
           this.locatingMap.set(false);
-          this.mapLocationMessage.set(`Você está fora da área de ${missionCityMap.name}. O mapa da missão foi mantido.`);
+          this.mapLocationMessage.set('Você está fora das áreas offline de Rio Tinto e João Pessoa. O mapa da missão foi mantido.');
           this.centerMissionCity();
           if (centerMap) {
             this.notifications.info(this.mapLocationMessage());
@@ -1137,11 +1141,15 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
 
   private refreshMapView(): void {
     if (!this.map) return;
+    const currentCity = this.userCoordinates
+      ? this.findMissionCityByPoint(this.userCoordinates)
+      : undefined;
     const points: L.LatLngTuple[] = this.visits()
       .filter(visit => this.validCoordinates(visit.latitude, visit.longitude)
-        && this.missionCityBounds.contains([Number(visit.latitude), Number(visit.longitude)]))
+        && !!this.findMissionCityByPoint([Number(visit.latitude), Number(visit.longitude)])
+        && (!currentCity || this.findMissionCityByPoint([Number(visit.latitude), Number(visit.longitude)])?.id === currentCity.id))
       .map(visit => [Number(visit.latitude), Number(visit.longitude)]);
-    if (this.userCoordinates && this.missionCityBounds.contains(this.userCoordinates)) {
+    if (this.userCoordinates && this.findMissionCityByPoint(this.userCoordinates)) {
       points.push(this.userCoordinates);
     }
     if (points.length > 1) {
@@ -1153,13 +1161,19 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  private centerMissionCity(): void {
-    this.map?.setView(missionCityMap.center, missionCityMap.initialZoom);
+  private centerMissionCity(city: MissionCityMapProfile = missionCityMap): void {
+    this.map?.setView(city.center, city.initialZoom);
   }
 
-  private isMissionCitySearch(value: string): boolean {
+  private findMissionCityBySearch(value: string): MissionCityMapProfile | undefined {
     const normalized = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
-    return missionCityMap.searchTerms.some((term) => normalized === term || normalized.includes(term));
+    return missionCityMaps.find(city =>
+      city.searchTerms.some(term => normalized === term || normalized.includes(term))
+    );
+  }
+
+  private findMissionCityByPoint(point: L.LatLngExpression): MissionCityMapProfile | undefined {
+    return missionCityMaps.find(city => L.latLngBounds(city.bounds).contains(point));
   }
 
   private validCoordinates(latitude: unknown, longitude: unknown): boolean {
