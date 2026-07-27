@@ -3,16 +3,18 @@ package org.vindesertao.visit;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.jboss.logging.Logger;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.Base64;
-import java.util.LinkedHashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @ApplicationScoped
 public class PhotoStorageService {
     private static final String DEFAULT_FOLDER = "vinde-sertao/visitas";
+    private static final Logger LOG = Logger.getLogger(PhotoStorageService.class);
 
     private final boolean enabled;
     private final String folder;
@@ -35,6 +37,10 @@ public class PhotoStorageService {
         this.enabled = present(cloudName) && present(apiKey) && present(apiSecret);
         this.folder = present(folder) ? folder.trim() : DEFAULT_FOLDER;
         this.uploadClient = uploadClient;
+        if (!enabled) {
+            LOG.errorf("Cloudinary desabilitado. Variaveis ausentes: %s",
+                    String.join(", ", missingVariables(cloudName, apiKey, apiSecret)));
+        }
     }
 
     public boolean cloudinaryEnabled() {
@@ -47,13 +53,9 @@ public class PhotoStorageService {
         }
 
         byte[] image = decode(photoData);
-        Map<String, Object> parameters = new LinkedHashMap<>();
-        parameters.put("timestamp", Instant.now().getEpochSecond());
-        parameters.put("folder", folder);
-        parameters.put("resource_type", "image");
 
         try {
-            Map<?, ?> result = uploadClient.upload(image, parameters);
+            Map<?, ?> result = uploadClient.upload(image, ObjectUtils.asMap("folder", folder));
             String url = text(result.get("secure_url"));
             String publicId = text(result.get("public_id"));
             if (!present(url)) {
@@ -114,6 +116,14 @@ public class PhotoStorageService {
 
     private static String text(Object value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private static List<String> missingVariables(String cloudName, String apiKey, String apiSecret) {
+        List<String> missing = new ArrayList<>();
+        if (!present(cloudName)) missing.add("CLOUDINARY_CLOUD_NAME");
+        if (!present(apiKey)) missing.add("CLOUDINARY_API_KEY");
+        if (!present(apiSecret)) missing.add("CLOUDINARY_API_SECRET");
+        return missing;
     }
 
     @FunctionalInterface

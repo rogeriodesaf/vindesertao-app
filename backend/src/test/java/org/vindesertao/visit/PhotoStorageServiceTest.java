@@ -2,7 +2,6 @@ package org.vindesertao.visit;
 
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -10,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PhotoStorageServiceTest {
     @Test
-    void uploadsJpegDataUrlAsDecodedBytesWithUnixTimestampInSeconds() {
+    void uploadsJpegDataUrlAsDecodedBytesUsingOnlySdkUploadOptions() {
         AtomicReference<byte[]> uploaded = new AtomicReference<>();
         AtomicReference<Map<String, Object>> parameters = new AtomicReference<>();
         var service = service(uploaded, parameters, "jpeg-id");
@@ -68,11 +67,9 @@ class PhotoStorageServiceTest {
 
     private void assertUploadParameters(Map<String, Object> parameters) {
         assertEquals("vinde-sertao/visitas", parameters.get("folder"));
-        assertEquals("image", parameters.get("resource_type"));
-        assertInstanceOf(Long.class, parameters.get("timestamp"));
-        long timestamp = (long) parameters.get("timestamp");
-        assertTrue(Math.abs(Instant.now().getEpochSecond() - timestamp) <= 2);
-        assertTrue(timestamp < 10_000_000_000L, "timestamp deve estar em segundos Unix");
+        assertEquals(1, parameters.size());
+        assertFalse(parameters.containsKey("timestamp"));
+        assertFalse(parameters.containsKey("signature"));
         assertFalse(parameters.containsKey("api_secret"));
     }
 }
