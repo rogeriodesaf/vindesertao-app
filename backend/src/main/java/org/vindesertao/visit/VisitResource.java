@@ -63,7 +63,13 @@ public class VisitResource {
 
     @POST
     public VisitDtos.VisitResponse create(@Valid VisitDtos.VisitRequest request) {
-        return VisitDtos.VisitResponse.from(visitService.create(request));
+        try {
+            return VisitDtos.VisitResponse.from(visitService.create(request));
+        } catch (IllegalArgumentException | WebApplicationException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw new InternalServerErrorException(exceptionDetail(exception), exception);
+        }
     }
 
     @PUT
@@ -127,6 +133,22 @@ public class VisitResource {
 
     private OffsetDateTime parseDate(String value) {
         return value == null || value.isBlank() ? null : OffsetDateTime.parse(value);
+    }
+
+    private String exceptionDetail(RuntimeException exception) {
+        StringBuilder detail = new StringBuilder();
+        Throwable current = exception;
+        while (current != null) {
+            if (!detail.isEmpty()) {
+                detail.append(" | Causa: ");
+            }
+            detail.append(current.getClass().getSimpleName());
+            if (current.getMessage() != null && !current.getMessage().isBlank()) {
+                detail.append(": ").append(current.getMessage());
+            }
+            current = current.getCause();
+        }
+        return detail.toString();
     }
 
     private String escape(Object value) {

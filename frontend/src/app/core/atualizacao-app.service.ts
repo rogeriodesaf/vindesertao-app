@@ -44,7 +44,12 @@ export class AtualizacaoAppService implements OnDestroy {
   atualizarAgora(): void {
     if (!this.swUpdate.isEnabled || this.atualizando()) return;
     this.atualizando.set(true);
-    window.location.reload();
+    this.swUpdate.activateUpdate()
+      .then(() => window.location.reload())
+      .catch(() => {
+        this.atualizando.set(false);
+        window.location.reload();
+      });
   }
 
   private readonly checarAoReabrir = () => this.checarAtualizacao();

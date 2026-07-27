@@ -1,5 +1,8 @@
 {
   "$schema": "./node_modules/@angular/service-worker/config/schema.json",
+  "appData": {
+    "version": "offline-sync-v2"
+  },
   "index": "/index.html",
   "assetGroups": [
     {

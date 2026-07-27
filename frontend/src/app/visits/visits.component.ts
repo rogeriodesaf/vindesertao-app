@@ -10,7 +10,7 @@ import { AuthService } from '../core/auth.service';
 import { formatDateTime } from '../core/date-format';
 import { Territory, Visit } from '../core/models';
 import { NotificationService } from '../core/notification.service';
-import { OfflineVisitQueueService } from '../core/offline-visit-queue.service';
+import { normalizeOfflineVisit, OfflineVisitQueueService } from '../core/offline-visit-queue.service';
 import { EmptyStateComponent } from '../shared/empty-state.component';
 import { ListCardComponent, ListCardInfo } from '../shared/list-card.component';
 import { FormSectionComponent } from '../shared/form-section.component';
@@ -345,7 +345,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       this.fail('Preencha os campos obrigatórios antes de salvar.');
       return;
     }
-    const payload = { ...this.form };
+    const payload = normalizeOfflineVisit(this.form);
     const editing = !!this.editingId();
     this.saving.set(true);
     if (!editing && typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -912,9 +912,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
 
   private handleOnline = (): void => {
     this.online.set(true);
-    if (this.offlineQueue.pendingCount() > 0) {
-      this.syncOfflineVisits();
-    }
+    this.offlineQueue.refreshCount();
   };
 
   private handleOffline = (): void => {
