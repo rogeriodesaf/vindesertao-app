@@ -1,6 +1,9 @@
 package org.vindesertao.children;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -10,7 +13,8 @@ public class ChildrenDtos {
             @NotBlank String childName,
             String guardianName,
             String guardianPhone,
-            Integer age,
+            @Min(0) @Max(17) Integer age,
+            @Pattern(regexp = "MALE|FEMALE", message = "Sexo deve ser MALE ou FEMALE.") String gender,
             String neighborhood,
             @NotBlank String city,
             String activityName,
@@ -24,6 +28,7 @@ public class ChildrenDtos {
             String guardianName,
             String guardianPhone,
             Integer age,
+            String gender,
             String neighborhood,
             String city,
             String activityName,
@@ -42,6 +47,7 @@ public class ChildrenDtos {
                     record.guardianName,
                     record.guardianPhone,
                     record.age,
+                    record.gender,
                     record.neighborhood,
                     record.city,
                     record.activityName,
@@ -62,6 +68,11 @@ public class ChildrenDtos {
     public record ChildrenSummary(
             long totalChildren,
             long totalRecords,
+            long boys,
+            long girls,
+            double averageAge,
+            long distinctGuardians,
+            long distinctNeighborhoods,
             List<CountItem> byActivity,
             List<CountItem> byResponsible,
             List<CountItem> byNeighborhood,

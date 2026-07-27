@@ -27,7 +27,9 @@ const iconPaths: Record<string, string> = {
   money: 'M4 6h16v12H4V6Zm8 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
   status: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm-4-10 3 3 5-6',
   edit: 'm4 20 4-1 11-11-3-3L5 16l-1 4Z',
-  open: 'M14 3h7v7m0-7L10 14M19 13v8H3V5h8'
+  open: 'M14 3h7v7m0-7L10 14M19 13v8H3V5h8',
+  camera: 'M4 7h3l2-3h6l2 3h3v13H4V7Zm8 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
+  delete: 'M4 7h16M9 7V4h6v3m3 0-1 14H7L6 7m4 4v6m4-6v6'
 };
 
 @Component({
@@ -41,7 +43,7 @@ const iconPaths: Record<string, string> = {
       <header>
         <h3>{{ title }}</h3>
         @if (state) { <span class="list-card-state">{{ state }}</span> }
-        @if (actions.length) {
+        @if (actions.length && !actionsInline) {
           <button type="button" class="list-card-menu-button" aria-label="Abrir ações" title="Ações"
             [attr.aria-expanded]="menuOpen()" (click)="toggleMenu($event)">⋮</button>
           @if (menuOpen()) {
@@ -66,6 +68,16 @@ const iconPaths: Record<string, string> = {
           }
         }
       </div>
+      @if (actions.length && actionsInline) {
+        <footer class="list-card-quick-actions" aria-label="Ações do cadastro">
+          @for (item of actions; track item.id) {
+            <button type="button" class="secondary" [class.danger]="item.danger" (click)="choose(item.id, $event)">
+              @if (item.icon) { <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="icon(item.icon)"></path></svg> }
+              {{ item.label }}
+            </button>
+          }
+        </footer>
+      }
     </article>
   `
 })
@@ -73,6 +85,7 @@ export class ListCardComponent {
   @Input({ required: true }) title = '';
   @Input() infos: ListCardInfo[] = [];
   @Input() actions: ListCardAction[] = [];
+  @Input() actionsInline = false;
   @Input() state = '';
   @Input() color = '';
   @Input() interactive = false;

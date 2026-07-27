@@ -168,6 +168,10 @@ export class ApiService {
     return this.http.put<ChildRecord>(`${environment.apiBaseUrl}/children/${record.id}`, record);
   }
 
+  deleteChild(id: number) {
+    return this.http.delete<void>(`${environment.apiBaseUrl}/children/${id}`);
+  }
+
   exportChildren(params: Record<string, string | number | undefined> = {}) {
     return this.http.get(`${environment.apiBaseUrl}/children/export.xlsx`, {
       params: this.params(params),

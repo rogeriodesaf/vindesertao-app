@@ -26,6 +26,9 @@ public class ChildRecord extends PanacheEntityBase {
 
     public Integer age;
 
+    @Column(length = 16)
+    public String gender;
+
     @Column(length = 120)
     public String neighborhood;
 

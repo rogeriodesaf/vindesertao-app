@@ -24,8 +24,10 @@ type DatePreset = 'today' | '7days' | '30days' | 'month' | 'custom';
         </div>
       }
       <div class="date-range-actions">
-        <button type="button" class="secondary" (click)="clearDates()">Limpar</button>
-        <button type="button" (click)="filter.emit()">Filtrar</button>
+        <button type="button" class="secondary" [disabled]="loading" (click)="clearDates()">Limpar</button>
+        <button type="button" [class.loading]="loading" [disabled]="loading" (click)="filter.emit()">
+          {{ loading ? 'Filtrando...' : 'Filtrar' }}
+        </button>
       </div>
     </section>
   `
@@ -34,6 +36,7 @@ export class DateRangeFilterComponent {
   @Input() from = '';
   @Input() to = '';
   @Input() valueMode: 'date' | 'datetime' = 'datetime';
+  @Input() loading = false;
   @Output() fromChange = new EventEmitter<string>();
   @Output() toChange = new EventEmitter<string>();
   @Output() filter = new EventEmitter<void>();

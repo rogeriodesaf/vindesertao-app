@@ -239,6 +239,7 @@ export interface ChildRecord {
   guardianName?: string;
   guardianPhone?: string;
   age?: number;
+  gender?: 'MALE' | 'FEMALE';
   neighborhood?: string;
   city: string;
   activityName?: string;
@@ -246,11 +247,18 @@ export interface ChildRecord {
   responsibleUserId?: number;
   responsibleUserName?: string;
   createdAt?: string;
+  photoUrl?: string;
+  photoFileName?: string;
 }
 
 export interface ChildrenSummary {
   totalChildren: number;
   totalRecords: number;
+  boys: number;
+  girls: number;
+  averageAge: number;
+  distinctGuardians: number;
+  distinctNeighborhoods: number;
   byActivity: CountItem[];
   byResponsible: CountItem[];
   byNeighborhood: CountItem[];

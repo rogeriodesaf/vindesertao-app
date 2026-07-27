@@ -61,6 +61,15 @@ public class ChildrenService {
         throw new ForbiddenException(edit ? "Sem permissao para editar este cadastro." : "Sem permissao para ver este cadastro.");
     }
 
+    @Transactional
+    public void delete(Long id) {
+        AppUser user = requireAccess();
+        ChildRecord record = getAllowed(id, true, user);
+        String before = snapshot(record);
+        records.delete(record);
+        auditService.log("DELETE", "CHILDREN", id, before, null);
+    }
+
     public PanacheQuery<ChildRecord> filtered(String activityName, Long responsibleUserId, String neighborhood,
                                              OffsetDateTime from, OffsetDateTime to) {
         AppUser user = requireAccess();
@@ -103,6 +112,16 @@ public class ChildrenService {
         return new ChildrenDtos.ChildrenSummary(
                 rows.size(),
                 rows.size(),
+                rows.stream().filter(row -> "MALE".equals(row.gender)).count(),
+                rows.stream().filter(row -> "FEMALE".equals(row.gender)).count(),
+                rows.stream()
+                        .map(row -> row.age)
+                        .filter(Objects::nonNull)
+                        .mapToInt(Integer::intValue)
+                        .average()
+                        .orElse(0),
+                distinctCount(rows, row -> row.guardianName),
+                distinctCount(rows, row -> row.neighborhood),
                 count(rows, row -> blankLabel(row.activityName)),
                 count(rows, row -> row.responsibleUser == null ? "Sem responsavel" : row.responsibleUser.name),
                 count(rows, row -> blankLabel(row.neighborhood)),
@@ -124,8 +143,9 @@ public class ChildrenService {
     private void apply(ChildrenDtos.ChildRequest request, ChildRecord record) {
         record.childName = request.childName();
         record.guardianName = request.guardianName();
-        record.guardianPhone = request.guardianPhone();
+        record.guardianPhone = digits(request.guardianPhone());
         record.age = request.age();
+        record.gender = request.gender();
         record.neighborhood = request.neighborhood();
         record.city = request.city();
         record.activityName = request.activityName();
@@ -146,9 +166,30 @@ public class ChildrenService {
         return value == null || value.isBlank() ? "Nao informado" : value;
     }
 
+    private long distinctCount(List<ChildRecord> rows,
+                               java.util.function.Function<ChildRecord, String> classifier) {
+        return rows.stream()
+                .map(classifier)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .map(value -> value.toLowerCase(Locale.ROOT))
+                .distinct()
+                .count();
+    }
+
+    private String digits(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.replaceAll("\\D", "");
+        return normalized.isBlank() ? null : normalized;
+    }
+
     private String snapshot(ChildRecord record) {
         return "{\"childName\":\"" + safe(record.childName)
                 + "\",\"guardianName\":\"" + safe(record.guardianName)
+                + "\",\"gender\":\"" + safe(record.gender)
                 + "\",\"activityName\":\"" + safe(record.activityName)
                 + "\",\"neighborhood\":\"" + safe(record.neighborhood)
                 + "\",\"responsible\":\"" + safe(record.responsibleUser == null ? null : record.responsibleUser.email) + "\"}";

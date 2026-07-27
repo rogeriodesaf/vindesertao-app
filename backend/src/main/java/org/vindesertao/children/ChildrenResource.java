@@ -80,6 +80,13 @@ public class ChildrenResource {
         return ChildrenDtos.ChildResponse.from(service.update(id, request));
     }
 
+    @DELETE
+    @Path("/{id}")
+    public Response delete(@PathParam("id") Long id) {
+        service.delete(id);
+        return Response.noContent().build();
+    }
+
     @GET
     @Path("/export.xlsx")
     @Produces(XLSX_MEDIA_TYPE)

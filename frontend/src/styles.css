@@ -76,9 +76,22 @@ button, .button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: transform 150ms ease, background 150ms ease, border-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
 }
 button:hover, .button:hover { background: var(--brand-strong); }
+button:active:not(:disabled), .button:active { transform: scale(.98); }
 button.secondary, .button.secondary { background: var(--color-hover); color: var(--text); border: 1px solid var(--line); }
+button.loading::before {
+  content: '';
+  width: 15px;
+  height: 15px;
+  margin-right: 8px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 999px;
+  animation: loading-spin .7s linear infinite;
+}
+@keyframes loading-spin { to { transform: rotate(360deg); } }
 input, select, textarea {
   width: 100%;
   min-height: 38px;
@@ -688,6 +701,32 @@ h2 { font-size: 17px; }
 .list-card-menu button { min-height: 44px; justify-content: flex-start; gap: 9px; border-radius: 10px; background: transparent; color: var(--text); }
 .list-card-menu button:hover { background: var(--color-hover); }
 .list-card-menu button.danger { color: var(--danger); }
+.list-card-quick-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.list-card-quick-actions button {
+  flex: 1 1 auto;
+  min-width: 92px;
+  min-height: 40px;
+  gap: 7px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+.list-card-quick-actions button.danger { color: var(--danger); }
+.list-card-quick-actions svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .compact-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding-top: 12px; }
 .compact-pagination button { width: 44px; min-width: 44px; min-height: 44px; padding: 0; border-radius: 999px; font-size: 24px; }
 .compact-pagination strong { min-width: 56px; color: var(--muted); text-align: center; }
@@ -1091,6 +1130,80 @@ app-date-range-filter { min-width: 0; display: block; }
 .split { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 18px; }
 .social-layout { grid-template-columns: 380px minmax(0, 1fr); align-items: start; }
 .social-analytics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.children-layout { grid-template-columns: minmax(340px, 400px) minmax(0, 1fr); }
+.children-editor { position: sticky; top: 18px; min-width: 0; gap: 14px; }
+.children-save-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-success);
+  border-radius: 14px;
+  background: var(--color-success-surface);
+  color: var(--color-success);
+  animation: children-feedback-in 200ms ease-out;
+}
+.children-save-feedback > div:first-child { display: grid; gap: 3px; }
+.children-save-feedback span { color: var(--text); font-size: 13px; }
+.children-save-feedback .actions { flex-wrap: nowrap; }
+.children-report-head { align-items: center; }
+.children-export-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.children-metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.children-report .chart-row { grid-template-columns: minmax(100px, 1fr) minmax(70px, 1fr) minmax(76px, auto); }
+.children-report .chart-row strong { color: var(--text); font-size: 13px; text-align: right; white-space: nowrap; }
+.children-table .list-head label { width: min(220px, 100%); }
+.auto-resize-textarea { min-height: 76px; max-height: 240px; overflow-y: auto; resize: none; }
+.skeleton-card, .skeleton-panel, .skeleton-list-card {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--line);
+  background: var(--color-hover);
+}
+.skeleton-card::after, .skeleton-panel::after, .skeleton-list-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--color-surface-elevated) 72%, transparent) 50%, transparent 80%);
+  transform: translateX(-100%);
+  animation: skeleton-shimmer 1.25s ease-in-out infinite;
+}
+.skeleton-card span, .skeleton-card strong {
+  display: block;
+  width: 64%;
+  height: 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+}
+.skeleton-card strong { width: 34%; height: 32px; }
+.skeleton-panel { min-height: 220px; border: 1px solid var(--line); border-radius: 14px; }
+.skeleton-list-card { min-height: 250px; }
+.children-photo-backdrop {
+  position: fixed;
+  z-index: 2000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: var(--color-overlay);
+}
+.children-photo-modal {
+  width: min(760px, 100%);
+  max-height: calc(100dvh - 40px);
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-elevated);
+}
+.children-photo-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.children-photo-head button { width: 44px; min-width: 44px; padding: 0; font-size: 25px; }
+.children-photo-modal img { width: 100%; max-height: calc(100dvh - 130px); display: block; object-fit: contain; border-radius: 12px; background: #111; }
+@keyframes children-feedback-in { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes skeleton-shimmer { to { transform: translateX(100%); } }
 .editor, .table-wrap {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -1582,6 +1695,16 @@ tbody tr:hover { background: var(--color-hover); }
   .map-toolbar input { grid-column: 1 / -1; }
   .map-toolbar button, .map-toolbar .button { width: 100%; }
   .metric-grid, .analytics-grid, .profile-summary, .team-report-grid, .split, .social-layout, .social-analytics, .support-layout, .teams-layout, .territory-layout, .duplicate-grid { grid-template-columns: 1fr; }
+  .children-layout { grid-template-columns: 1fr; }
+  .children-editor { position: static; }
+  .children-save-feedback { align-items: stretch; flex-direction: column; }
+  .children-save-feedback .actions { width: 100%; flex-wrap: wrap; }
+  .children-report-head { align-items: stretch; }
+  .children-export-actions { width: 100%; justify-content: stretch; }
+  .children-export-actions button { flex: 1 1 150px; }
+  .children-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .children-report .chart-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .children-report .chart-row .bar-track { grid-column: 1 / -1; grid-row: 2; }
   .territory-map { min-height: max(68vh, 560px); }
   .territory-page { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
   .territory-draw-toolbar {
@@ -1700,6 +1823,14 @@ tbody tr:hover { background: var(--color-hover); }
   .mobile-bottom-nav a, .mobile-bottom-nav button { font-size: 9px; }
   app-visits .location-primary-actions, app-visits .location-address-action { grid-template-columns: 1fr; }
   app-visits .form-section-badge { max-width: 96px; }
+  .children-metric-grid { grid-template-columns: 1fr; }
+  .children-form-actions { display: grid; grid-template-columns: 1fr; }
+  .children-form-actions button { width: 100%; }
+  .list-card-quick-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .list-card-quick-actions button { width: 100%; min-width: 0; }
+  .list-card-quick-actions button:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .children-photo-backdrop { padding: 8px; }
+  .children-photo-modal { max-height: calc(100dvh - 16px); padding: 12px; }
   .date-picker-group.date-picker-with-time, .date-range-custom { grid-template-columns: 1fr; }
   .date-range-chips button { width: auto; flex: 1 1 auto; }
   .date-range-actions { display: grid; grid-template-columns: 1fr 1fr; }
@@ -1724,4 +1855,9 @@ tbody tr:hover { background: var(--color-hover); }
     box-shadow: none;
     break-inside: avoid;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button, .button, .list-card { transition: none; }
+  .skeleton-card::after, .skeleton-panel::after, .skeleton-list-card::after { animation: none; }
 }
