@@ -1,6 +1,7 @@
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { ApiService } from './api.service';
+import { environment } from '../../environments/environment';
 import { Visit } from './models';
 
 export interface PendingVisit {
@@ -19,7 +20,7 @@ export class OfflineVisitQueueService {
   private dbPromise?: Promise<IDBDatabase>;
   private syncPromise?: Promise<{ sent: number; failed: number }>;
 
-  constructor(private api: ApiService) {
+  constructor(private http: HttpClient) {
     this.refreshCount();
   }
 
@@ -45,10 +46,15 @@ export class OfflineVisitQueueService {
       return this.syncPromise;
     }
     this.syncing.set(true);
-    this.syncPromise = this.runSync().finally(() => {
-      this.syncing.set(false);
-      this.syncPromise = undefined;
-    });
+    this.syncPromise = this.runSync()
+      .catch((error) => {
+        console.error('[Sincronização offline] Exceção:', this.exceptionMessage(error));
+        throw error;
+      })
+      .finally(() => {
+        this.syncing.set(false);
+        this.syncPromise = undefined;
+      });
     return this.syncPromise;
   }
 
@@ -61,6 +67,8 @@ export class OfflineVisitQueueService {
   private async runSync(): Promise<{ sent: number; failed: number }> {
     const db = await this.db();
     const items = await this.readAll(db);
+    const url = `${environment.apiBaseUrl}/visits`;
+    console.info('[Sincronização offline] Fichas pendentes:', items.length);
     let sent = 0;
     let failed = 0;
 
@@ -69,10 +77,20 @@ export class OfflineVisitQueueService {
         continue;
       }
       try {
-        await firstValueFrom(this.api.createVisit(item.visit));
+        console.info('[Sincronização offline] URL:', url);
+        const response = await firstValueFrom(
+          this.http.post<Visit>(url, item.visit, { observe: 'response' })
+        );
+        console.info('[Sincronização offline] Status HTTP:', response.status);
+        console.info('[Sincronização offline] Corpo da resposta:', response.body);
         await this.delete(db, item.id);
         sent++;
       } catch (error) {
+        if (error instanceof HttpErrorResponse) {
+          console.error('[Sincronização offline] Status HTTP:', error.status);
+          console.error('[Sincronização offline] Corpo da resposta:', error.error);
+        }
+        console.error('[Sincronização offline] Exceção:', this.exceptionMessage(error));
         failed++;
         await this.updateFailure(db, item, this.message(error));
       }
@@ -156,5 +174,12 @@ export class OfflineVisitQueueService {
       return String((error as { message?: string }).message || 'Falha ao sincronizar.');
     }
     return 'Falha ao sincronizar.';
+  }
+
+  private exceptionMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return String(error);
   }
 }
