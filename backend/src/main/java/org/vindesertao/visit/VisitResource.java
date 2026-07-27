@@ -156,7 +156,7 @@ public class VisitResource {
         return "\"" + text.replace("\"", "\"\"") + "\"";
     }
 
-    private byte[] workbook(List<HouseholdVisit> visits) {
+    byte[] workbook(List<HouseholdVisit> visits) {
         try {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             try (ZipOutputStream zip = new ZipOutputStream(out, StandardCharsets.UTF_8)) {
@@ -193,6 +193,10 @@ public class VisitResource {
                         """);
                 writeEntry(zip, "xl/styles.xml", stylesXml());
                 writeEntry(zip, "xl/worksheets/sheet1.xml", sheetXml(visits));
+                String photoRelationships = photoRelationshipsXml(visits);
+                if (!photoRelationships.isBlank()) {
+                    writeEntry(zip, "xl/worksheets/_rels/sheet1.xml.rels", photoRelationships);
+                }
             }
             return out.toByteArray();
         } catch (IOException exception) {
@@ -204,7 +208,7 @@ public class VisitResource {
         List<List<String>> rows = new ArrayList<>();
         rows.add(Arrays.asList("Nome", "Telefone", "Rua", "Numero", "Bairro", "Cidade",
                 "Aceita visitas", "Idade", "Moradores", "Ponto de referencia", "Pedido de oracao", "Proxima visita",
-                "Observacoes", "Foto anexada", "Link da foto", "Link do Street View", "Projetista", "Equipe", "Cadastrado em"));
+                "Observacoes", "Foto anexada", "Foto", "Link do Street View", "Projetista", "Equipe", "Cadastrado em"));
         visits.forEach(visit -> rows.add(Arrays.asList(
                 text(visit.personName),
                 text(visit.phone),
@@ -220,7 +224,7 @@ public class VisitResource {
                 formatDate(visit.nextVisitAt),
                 text(visit.notes),
                 hasPhoto(visit) ? "Sim" : "Nao",
-                text(visit.photoUrl),
+                photoLink(visit).isBlank() ? "Sem foto" : "Ver foto",
                 text(visit.streetViewUrl),
                 visit.responsibleUser == null ? "" : text(visit.responsibleUser.name),
                 visit.team == null ? "" : text(visit.team.name),
@@ -232,7 +236,8 @@ public class VisitResource {
         String lastColumn = columnName(rows.get(0).size());
                 StringBuilder xml = new StringBuilder("""
                 <?xml version="1.0" encoding="UTF-8"?>
-                <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+                <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+                           xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
                   <sheetViews>
                     <sheetView workbookViewId="0">
                       <pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/>
@@ -276,14 +281,18 @@ public class VisitResource {
                   <mergeCells count="1">
                     <mergeCell ref="A1:%s1"/>
                   </mergeCells>
+                  %s
                 </worksheet>
-                """.formatted(lastColumn, lastRow, lastColumn));
+                """.formatted(lastColumn, lastRow, lastColumn, photoHyperlinksXml(visits)));
         return xml.toString();
     }
 
     private int bodyStyle(int columnIndex, String value) {
         if (columnIndex == 6 || columnIndex == 13) {
             return "Sim".equalsIgnoreCase(value) ? 5 : 6;
+        }
+        if (columnIndex == 14 && "Ver foto".equals(value)) {
+            return 7;
         }
         return 4;
     }
@@ -292,12 +301,13 @@ public class VisitResource {
         return """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-                  <fonts count="5">
+                  <fonts count="6">
                     <font><sz val="11"/><color rgb="FF1D2A24"/><name val="Calibri"/></font>
                     <font><b/><sz val="16"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
                     <font><i/><sz val="10"/><color rgb="FF607168"/><name val="Calibri"/></font>
                     <font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
                     <font><b/><sz val="11"/><color rgb="FF1D2A24"/><name val="Calibri"/></font>
+                    <font><u/><sz val="11"/><color rgb="FF0563C1"/><name val="Calibri"/></font>
                   </fonts>
                   <fills count="6">
                     <fill><patternFill patternType="none"/></fill>
@@ -318,7 +328,7 @@ public class VisitResource {
                     </border>
                   </borders>
                   <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-                  <cellXfs count="7">
+                  <cellXfs count="8">
                     <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
                     <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center"/></xf>
                     <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
@@ -326,10 +336,53 @@ public class VisitResource {
                     <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"><alignment vertical="center"/></xf>
                     <xf numFmtId="0" fontId="4" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center"/></xf>
                     <xf numFmtId="0" fontId="4" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center"/></xf>
+                    <xf numFmtId="0" fontId="5" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"><alignment vertical="center"/></xf>
                   </cellXfs>
                   <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
                 </styleSheet>
                 """;
+    }
+
+    private String photoHyperlinksXml(List<HouseholdVisit> visits) {
+        StringBuilder links = new StringBuilder();
+        int relationship = 1;
+        for (int index = 0; index < visits.size(); index++) {
+            if (!photoLink(visits.get(index)).isBlank()) {
+                links.append("<hyperlink ref=\"O")
+                        .append(index + 5)
+                        .append("\" r:id=\"rId")
+                        .append(relationship++)
+                        .append("\"/>");
+            }
+        }
+        return links.isEmpty() ? "" : "<hyperlinks>" + links + "</hyperlinks>";
+    }
+
+    private String photoRelationshipsXml(List<HouseholdVisit> visits) {
+        StringBuilder relationships = new StringBuilder();
+        int relationship = 1;
+        for (HouseholdVisit visit : visits) {
+            String link = photoLink(visit);
+            if (!link.isBlank()) {
+                relationships.append("<Relationship Id=\"rId")
+                        .append(relationship++)
+                        .append("\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink\" Target=\"")
+                        .append(xml(link))
+                        .append("\" TargetMode=\"External\"/>");
+            }
+        }
+        if (relationships.isEmpty()) {
+            return "";
+        }
+        return """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">%s</Relationships>
+                """.formatted(relationships);
+    }
+
+    private String photoLink(HouseholdVisit visit) {
+        String link = text(visit.photoUrl).trim();
+        return link.startsWith("https://") || link.startsWith("http://") ? link : "";
     }
 
     private void writeEntry(ZipOutputStream zip, String name, String content) throws IOException {

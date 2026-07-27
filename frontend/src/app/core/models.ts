@@ -55,7 +55,11 @@ export interface Visit {
   responsibleUserId?: number;
   responsibleUserName?: string;
   teamId?: number;
+  teamName?: string;
   createdAt?: string;
+  createdBy?: string;
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export interface CountItem {

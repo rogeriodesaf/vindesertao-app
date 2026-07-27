@@ -828,10 +828,20 @@ h2 { font-size: 17px; }
   box-shadow: 0 2px 8px rgba(0, 0, 0, .38);
 }
 .visit-photo-map-marker svg { width: 16px; height: 16px; fill: #fff; }
-.visit-map-popup { min-width: 190px; display: grid; gap: 6px; }
+.visit-map-popup { width: min(270px, calc(100vw - 86px)); display: grid; gap: 7px; }
 .visit-map-popup > strong { font-size: 15px; color: var(--color-text); }
 .visit-map-popup > span,
 .visit-map-popup > small { line-height: 1.35; color: var(--color-text-secondary); }
+.visit-map-status { font-weight: 750; color: var(--color-text) !important; }
+.visit-map-prayer {
+  margin: 2px 0;
+  padding: 8px;
+  border-left: 3px solid var(--color-warning);
+  border-radius: 6px;
+  background: var(--color-warning-surface);
+  color: var(--color-text);
+  line-height: 1.4;
+}
 .visit-map-no-photo {
   margin-top: 3px;
   padding-top: 6px;
@@ -850,12 +860,62 @@ h2 { font-size: 17px; }
 }
 .visit-map-photo-button img { width: 100%; height: 120px; display: block; object-fit: cover; }
 .visit-map-photo-button:disabled { opacity: 1; cursor: default; }
+.visit-map-photo-error[hidden] { display: none; }
 .visit-map-photo-error {
   display: block;
   padding: 18px 10px;
   color: var(--color-text-secondary);
   font-weight: 700;
 }
+.visit-map-details-button { width: 100%; min-height: 38px; margin-top: 2px; }
+.visit-marker-category-prayer .visit-photo-map-marker {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-warning) 28%, transparent), 0 2px 8px rgba(0, 0, 0, .38);
+}
+.visit-details-backdrop {
+  position: fixed;
+  z-index: 1900;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: var(--color-overlay);
+}
+.visit-details-modal {
+  width: min(760px, 100%);
+  max-height: calc(100dvh - 40px);
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-elevated);
+}
+.visit-details-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.visit-details-head h2 { margin: 2px 0 0; }
+.visit-details-head small { color: var(--color-text-secondary); }
+.visit-details-head button { font-size: 28px; line-height: 1; }
+.visit-details-photo {
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #111;
+}
+.visit-details-photo img { width: 100%; max-height: 360px; display: block; object-fit: contain; }
+.visit-details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.visit-details-grid > div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+.visit-details-grid > .wide { grid-column: 1 / -1; }
+.visit-details-grid dt { margin-bottom: 4px; color: var(--color-text-secondary); font-size: 12px; font-weight: 750; }
+.visit-details-grid dd { margin: 0; overflow-wrap: anywhere; line-height: 1.4; white-space: pre-wrap; }
 .visit-photo-modal-backdrop {
   position: fixed;
   z-index: 2000;
@@ -887,7 +947,9 @@ h2 { font-size: 17px; }
   object-fit: contain;
   border-radius: 12px;
   background: #111;
+  touch-action: pinch-zoom;
 }
+.visit-photo-zoom-hint { color: var(--color-text-secondary); text-align: center; }
 .visit-photo-error {
   min-height: 180px;
   display: grid;
@@ -1583,6 +1645,11 @@ tbody tr:hover { background: var(--color-hover); }
   .map-toolbar input, .map-toolbar button { grid-column: 1; }
   .photo-preview { grid-template-columns: 1fr; }
   .photo-preview img { width: 100%; height: 180px; }
+  .visit-details-backdrop, .visit-photo-modal-backdrop { padding: 8px; }
+  .visit-details-modal, .visit-photo-modal { max-height: calc(100dvh - 16px); padding: 13px; }
+  .visit-details-grid { grid-template-columns: 1fr; }
+  .visit-details-grid > .wide { grid-column: 1; }
+  .visit-photo-zoom-hint { font-size: 11px; }
   .photo-actions, .offline-actions { display: grid !important; grid-template-columns: 1fr; }
   .photo-actions .button { width: 100%; }
   .mobile-more-menu .nav-group { grid-template-columns: 1fr; }

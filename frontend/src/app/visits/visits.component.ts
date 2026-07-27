@@ -18,13 +18,14 @@ import { DatePickerComponent } from '../shared/date-picker.component';
 
 type VisitFormSection = 'basic' | 'location' | 'photo' | 'more' | 'visits';
 type LocationSource = 'none' | 'gps' | 'map' | 'manual' | 'address';
+type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
 
 @Component({
   selector: 'app-visits',
   standalone: true,
   imports: [FormsModule, SlicePipe, ListCardComponent, EmptyStateComponent, FormSectionComponent, DatePickerComponent],
   host: {
-    '(document:keydown.escape)': 'closePhoto()'
+    '(document:keydown.escape)': 'closePhoto(); closeVisitDetails()'
   },
   template: `
     <div class="mobile-view-toggle" role="group" aria-label="Visualização da tela de visitas">
@@ -175,6 +176,47 @@ type LocationSource = 'none' | 'gps' | 'map' | 'manual' | 'address';
         }
       </aside>
     </section>
+    @if (visitDetails(); as visit) {
+      <div class="visit-details-backdrop" (click)="closeVisitDetails()">
+        <section class="visit-details-modal" role="dialog" aria-modal="true" aria-labelledby="visit-details-title" (click)="$event.stopPropagation()">
+          <div class="visit-details-head">
+            <div>
+              <small>Detalhes da visita</small>
+              <h2 id="visit-details-title">{{ visit.personName }}</h2>
+            </div>
+            <button type="button" class="icon-button" aria-label="Fechar detalhes" (click)="closeVisitDetails()">×</button>
+          </div>
+          @if (detailPhotoSource()) {
+            @if (detailPhotoLoadFailed()) {
+              <p class="visit-photo-error">Não foi possível carregar esta foto.</p>
+            } @else {
+              <button type="button" class="visit-details-photo" (click)="openPhoto(detailPhotoSource()!, visit.personName)">
+                <img [src]="detailPhotoSource()" [alt]="'Foto da visita de ' + visit.personName" (error)="detailPhotoLoadFailed.set(true)">
+              </button>
+            }
+          } @else {
+            <p class="visit-map-no-photo">Sem foto registrada</p>
+          }
+          <dl class="visit-details-grid">
+            <div><dt>Nome</dt><dd>{{ visit.personName }}</dd></div>
+            @if (visit.phone) { <div><dt>Telefone</dt><dd>{{ visit.phone }}</dd></div> }
+            <div><dt>Localização</dt><dd>{{ visitAddress(visit) }}</dd></div>
+            <div><dt>Data e hora</dt><dd>{{ formatDate(visit.createdAt) }}</dd></div>
+            @if (visit.teamName) { <div><dt>Equipe</dt><dd>{{ visit.teamName }}</dd></div> }
+            @if (visit.responsibleUserName) { <div><dt>Projetista responsável</dt><dd>{{ visit.responsibleUserName }}</dd></div> }
+            <div><dt>Deseja receber visitas</dt><dd>{{ visit.wantsVisits ? 'Sim' : 'Não' }}</dd></div>
+            @if (visit.personAge !== undefined) { <div><dt>Idade</dt><dd>{{ visit.personAge }}</dd></div> }
+            @if (visit.householdSize !== undefined) { <div><dt>Moradores</dt><dd>{{ visit.householdSize }}</dd></div> }
+            @if (visit.referencePoint) { <div><dt>Ponto de referência</dt><dd>{{ visit.referencePoint }}</dd></div> }
+            @if (visit.prayerRequest) { <div class="wide"><dt>Pedido de oração</dt><dd>{{ visit.prayerRequest }}</dd></div> }
+            @if (visit.notes) { <div class="wide"><dt>Observações</dt><dd>{{ visit.notes }}</dd></div> }
+            @if (visit.nextVisitAt) { <div><dt>Próxima visita</dt><dd>{{ formatDate(visit.nextVisitAt) }}</dd></div> }
+            @if (visit.streetViewUrl) { <div><dt>Street View</dt><dd><a [href]="visit.streetViewUrl" target="_blank" rel="noopener">Abrir localização</a></dd></div> }
+            @if (visit.updatedAt) { <div><dt>Última atualização</dt><dd>{{ formatDate(visit.updatedAt) }}</dd></div> }
+          </dl>
+        </section>
+      </div>
+    }
     @if (photoViewer()) {
       <div class="visit-photo-modal-backdrop" (click)="closePhoto()">
         <section class="visit-photo-modal" role="dialog" aria-modal="true" aria-labelledby="visit-photo-modal-title" (click)="$event.stopPropagation()">
@@ -187,6 +229,7 @@ type LocationSource = 'none' | 'gps' | 'map' | 'manual' | 'address';
           } @else {
             <img [src]="photoViewer()?.src" [alt]="photoViewer()?.alt" (error)="photoLoadFailed.set(true)">
           }
+          <small class="visit-photo-zoom-hint">No celular, use o gesto de pinça para ampliar.</small>
         </section>
       </div>
     }
@@ -222,6 +265,9 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   locationSource = signal<LocationSource>('none');
   photoViewer = signal<{ src: string; alt: string; title: string } | null>(null);
   photoLoadFailed = signal(false);
+  visitDetails = signal<Visit | null>(null);
+  detailPhotoSource = signal<string | null>(null);
+  detailPhotoLoadFailed = signal(false);
   searchText = '';
   private map?: L.Map;
   private marker?: L.Marker;
@@ -741,19 +787,20 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     visible.forEach(({ visit, createdAt, pending: isPending }) => {
       const coordinates: L.LatLngTuple = [Number(visit.latitude), Number(visit.longitude)];
       const photoSource = this.visitPhotoSource(visit);
+      const category = this.markerCategory(visit, !!photoSource);
       const popup = this.visitPopup(visit, createdAt, photoSource, isPending);
-      if (photoSource) {
+      if (photoSource || category === 'prayer') {
         L.marker(coordinates, {
-          icon: this.photoMarkerIcon(visit.wantsVisits),
-          title: `${visit.personName} - foto registrada`
-        }).bindPopup(popup, { maxWidth: 280 }).addTo(this.visitLayer);
+          icon: this.visitMarkerIcon(category, !!photoSource, visit.wantsVisits),
+          title: `${visit.personName} - ${this.markerCategoryLabel(category)}`
+        }).bindPopup(popup, { maxWidth: 320 }).addTo(this.visitLayer);
         return;
       }
       L.circleMarker(coordinates, {
         radius: 7,
         color: this.cssColor(visit.wantsVisits ? '--color-success' : '--color-error'),
         fillOpacity: 0.8
-      }).bindPopup(popup, { maxWidth: 280 }).addTo(this.visitLayer);
+      }).bindPopup(popup, { maxWidth: 320 }).addTo(this.visitLayer);
     });
   }
 
@@ -773,6 +820,25 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     address.textContent = this.visitAddress(visit);
     popup.appendChild(address);
 
+    const responsible = document.createElement('span');
+    responsible.textContent = [
+      visit.teamName && `Equipe: ${visit.teamName}`,
+      visit.responsibleUserName && `Projetista: ${visit.responsibleUserName}`
+    ].filter(Boolean).join(' | ') || 'Responsável não informado';
+    popup.appendChild(responsible);
+
+    const wantsVisits = document.createElement('span');
+    wantsVisits.className = 'visit-map-status';
+    wantsVisits.textContent = visit.wantsVisits ? 'Deseja receber novas visitas' : 'Não deseja receber novas visitas';
+    popup.appendChild(wantsVisits);
+
+    if (visit.prayerRequest?.trim()) {
+      const prayer = document.createElement('p');
+      prayer.className = 'visit-map-prayer';
+      prayer.textContent = `Pedido de oração: ${visit.prayerRequest.trim()}`;
+      popup.appendChild(prayer);
+    }
+
     if (pending) {
       const status = document.createElement('small');
       status.textContent = 'Pendente de sincronização';
@@ -784,35 +850,44 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       noPhoto.className = 'visit-map-no-photo';
       noPhoto.textContent = 'Sem foto registrada';
       popup.appendChild(noPhoto);
-      return popup;
+    } else {
+      const thumbnail = document.createElement('button');
+      thumbnail.type = 'button';
+      thumbnail.className = 'visit-map-photo-button';
+      thumbnail.setAttribute('aria-label', `Ampliar foto de ${visit.personName}`);
+      const image = document.createElement('img');
+      image.src = photoSource;
+      image.alt = `Foto da visita de ${visit.personName}`;
+      const imageError = document.createElement('span');
+      imageError.className = 'visit-map-photo-error';
+      imageError.textContent = 'Não foi possível carregar a foto.';
+      imageError.hidden = true;
+      image.addEventListener('error', () => {
+        image.hidden = true;
+        imageError.hidden = false;
+        thumbnail.disabled = true;
+      });
+      thumbnail.addEventListener('click', (event) => {
+        event.preventDefault();
+        this.zone.run(() => this.openPhoto(photoSource, visit.personName));
+      });
+      thumbnail.append(image, imageError);
+      popup.appendChild(thumbnail);
     }
 
-    const thumbnail = document.createElement('button');
-    thumbnail.type = 'button';
-    thumbnail.className = 'visit-map-photo-button';
-    thumbnail.setAttribute('aria-label', `Ampliar foto de ${visit.personName}`);
-    const image = document.createElement('img');
-    image.src = photoSource;
-    image.alt = `Foto da visita de ${visit.personName}`;
-    const imageError = document.createElement('span');
-    imageError.className = 'visit-map-photo-error';
-    imageError.textContent = 'Não foi possível carregar a foto.';
-    imageError.hidden = true;
-    image.addEventListener('error', () => {
-      image.hidden = true;
-      imageError.hidden = false;
-      thumbnail.disabled = true;
-    });
-    thumbnail.addEventListener('click', (event) => {
+    const details = document.createElement('button');
+    details.type = 'button';
+    details.className = 'visit-map-details-button';
+    details.textContent = 'Ver detalhes';
+    details.addEventListener('click', (event) => {
       event.preventDefault();
-      this.zone.run(() => this.openPhoto(photoSource, visit.personName));
+      this.zone.run(() => this.openVisitDetails(visit));
     });
-    thumbnail.append(image, imageError);
-    popup.appendChild(thumbnail);
+    popup.appendChild(details);
     return popup;
   }
 
-  private visitAddress(visit: Visit): string {
+  visitAddress(visit: Visit): string {
     if (visit.manualAddress?.trim()) {
       return visit.manualAddress.trim();
     }
@@ -853,18 +928,34 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       : null;
   }
 
-  private photoMarkerIcon(wantsVisits: boolean): L.DivIcon {
-    const color = this.cssColor(wantsVisits ? '--color-success' : '--color-error');
+  private markerCategory(visit: Visit, hasPhoto: boolean): VisitMarkerCategory {
+    if (visit.prayerRequest?.trim()) {
+      return 'prayer';
+    }
+    return hasPhoto ? 'photo' : 'common';
+  }
+
+  private markerCategoryLabel(category: VisitMarkerCategory): string {
+    return category === 'prayer' ? 'pedido de oração' : category === 'photo' ? 'foto registrada' : 'visita';
+  }
+
+  private visitMarkerIcon(category: VisitMarkerCategory, hasPhoto: boolean, wantsVisits: boolean): L.DivIcon {
+    const color = category === 'prayer'
+      ? this.cssColor('--color-warning')
+      : this.cssColor(wantsVisits ? '--color-success' : '--color-error');
+    const symbol = hasPhoto
+      ? '<path d="M8.5 5 10 3h4l1.5 2H19a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3h3.5ZM12 8a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Zm0 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/>'
+      : '<path d="M12 21s-7-4.4-7-11a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 6.6-7 11-7 11Z"/>';
     return L.divIcon({
-      className: 'visit-photo-marker-wrapper',
-      html: `<span class="visit-photo-map-marker" style="--visit-marker-color:${color}" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8.5 5 10 3h4l1.5 2H19a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3h3.5ZM12 8a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Zm0 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg></span>`,
+      className: `visit-photo-marker-wrapper visit-marker-category-${category}`,
+      html: `<span class="visit-photo-map-marker" style="--visit-marker-color:${color}" aria-hidden="true"><svg viewBox="0 0 24 24">${symbol}</svg></span>`,
       iconSize: [30, 30],
       iconAnchor: [15, 15],
       popupAnchor: [0, -14]
     });
   }
 
-  private openPhoto(src: string, personName: string): void {
+  openPhoto(src: string, personName: string): void {
     this.photoLoadFailed.set(false);
     this.photoViewer.set({
       src,
@@ -876,6 +967,29 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   closePhoto(): void {
     this.photoViewer.set(null);
     this.photoLoadFailed.set(false);
+  }
+
+  private openVisitDetails(visit: Visit): void {
+    this.setVisitDetails(visit);
+    if (!visit.id) {
+      return;
+    }
+    this.api.visit(visit.id).subscribe({
+      next: (fullVisit) => this.setVisitDetails(fullVisit),
+      error: () => this.notifications.error('Não foi possível carregar todos os detalhes desta visita.')
+    });
+  }
+
+  private setVisitDetails(visit: Visit): void {
+    this.visitDetails.set(visit);
+    this.detailPhotoSource.set(this.visitPhotoSource(visit));
+    this.detailPhotoLoadFailed.set(false);
+  }
+
+  closeVisitDetails(): void {
+    this.visitDetails.set(null);
+    this.detailPhotoSource.set(null);
+    this.detailPhotoLoadFailed.set(false);
   }
 
   private renderTerritories(): void {
