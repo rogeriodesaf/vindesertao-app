@@ -816,6 +816,86 @@ h2 { font-size: 17px; }
 }
 .leaflet-control-zoom a { border-color: var(--color-border) !important; }
 .leaflet-control-attribution a { color: var(--color-primary-readable) !important; }
+.visit-photo-marker-wrapper { background: transparent; border: 0; }
+.visit-photo-map-marker {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: var(--visit-marker-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .38);
+}
+.visit-photo-map-marker svg { width: 16px; height: 16px; fill: #fff; }
+.visit-map-popup { min-width: 190px; display: grid; gap: 6px; }
+.visit-map-popup > strong { font-size: 15px; color: var(--color-text); }
+.visit-map-popup > span,
+.visit-map-popup > small { line-height: 1.35; color: var(--color-text-secondary); }
+.visit-map-no-photo {
+  margin-top: 3px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border);
+  font-weight: 700;
+}
+.visit-map-photo-button {
+  width: 100%;
+  min-height: 0;
+  margin-top: 3px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+.visit-map-photo-button img { width: 100%; height: 120px; display: block; object-fit: cover; }
+.visit-map-photo-button:disabled { opacity: 1; cursor: default; }
+.visit-map-photo-error {
+  display: block;
+  padding: 18px 10px;
+  color: var(--color-text-secondary);
+  font-weight: 700;
+}
+.visit-photo-modal-backdrop {
+  position: fixed;
+  z-index: 2000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, .78);
+}
+.visit-photo-modal {
+  width: min(920px, 100%);
+  max-height: calc(100dvh - 40px);
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-elevated);
+}
+.visit-photo-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.visit-photo-modal-head h2 { margin: 0; }
+.visit-photo-modal-head button { font-size: 28px; line-height: 1; }
+.visit-photo-modal img {
+  width: 100%;
+  max-height: calc(100dvh - 130px);
+  display: block;
+  object-fit: contain;
+  border-radius: 12px;
+  background: #111;
+}
+.visit-photo-error {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
 
 .page { padding: 24px; display: grid; gap: 20px; max-width: 100%; overflow-x: hidden; }
 .page-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; }

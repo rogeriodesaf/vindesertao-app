@@ -23,6 +23,9 @@ type LocationSource = 'none' | 'gps' | 'map' | 'manual' | 'address';
   selector: 'app-visits',
   standalone: true,
   imports: [FormsModule, SlicePipe, ListCardComponent, EmptyStateComponent, FormSectionComponent, DatePickerComponent],
+  host: {
+    '(document:keydown.escape)': 'closePhoto()'
+  },
   template: `
     <div class="mobile-view-toggle" role="group" aria-label="Visualização da tela de visitas">
       <button type="button" [class.active]="mobileView() === 'form'" (click)="showMobileView('form')">Cadastro</button>
@@ -172,6 +175,21 @@ type LocationSource = 'none' | 'gps' | 'map' | 'manual' | 'address';
         }
       </aside>
     </section>
+    @if (photoViewer()) {
+      <div class="visit-photo-modal-backdrop" (click)="closePhoto()">
+        <section class="visit-photo-modal" role="dialog" aria-modal="true" aria-labelledby="visit-photo-modal-title" (click)="$event.stopPropagation()">
+          <div class="visit-photo-modal-head">
+            <h2 id="visit-photo-modal-title">{{ photoViewer()?.title }}</h2>
+            <button type="button" class="icon-button" aria-label="Fechar foto" (click)="closePhoto()">×</button>
+          </div>
+          @if (photoLoadFailed()) {
+            <p class="visit-photo-error">Não foi possível carregar esta foto.</p>
+          } @else {
+            <img [src]="photoViewer()?.src" [alt]="photoViewer()?.alt" (error)="photoLoadFailed.set(true)">
+          }
+        </section>
+      </div>
+    }
   `
 })
 export class VisitsComponent implements AfterViewInit, OnDestroy {
@@ -202,6 +220,8 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   technicalDetailsOpen = signal(false);
   locationAccuracy = signal<number | null>(null);
   locationSource = signal<LocationSource>('none');
+  photoViewer = signal<{ src: string; alt: string; title: string } | null>(null);
+  photoLoadFailed = signal(false);
   searchText = '';
   private map?: L.Map;
   private marker?: L.Marker;
@@ -211,6 +231,8 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   private territoryLayer = L.layerGroup();
   private refreshHandle?: ReturnType<typeof setInterval>;
   private mapTileWarningShown = false;
+  private photoBlobUrls = new WeakMap<Blob, string>();
+  private createdPhotoUrls = new Set<string>();
 
   constructor(public api: ApiService, private http: HttpClient, private auth: AuthService, private zone: NgZone, private notifications: NotificationService, public offlineQueue: OfflineVisitQueueService) {}
 
@@ -223,7 +245,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     window.addEventListener('offline', this.handleOffline);
     window.addEventListener('resize', this.handleResize);
     window.addEventListener('orientationchange', this.handleResize);
-    this.offlineQueue.refreshCount();
+    this.offlineQueue.refreshCount().then(() => this.renderMarkers(this.visits()));
   }
 
   private initializeMap(): void {
@@ -261,6 +283,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     window.removeEventListener('offline', this.handleOffline);
     window.removeEventListener('resize', this.handleResize);
     window.removeEventListener('orientationchange', this.handleResize);
+    this.createdPhotoUrls.forEach((url) => URL.revokeObjectURL(url));
     this.map?.remove();
   }
 
@@ -707,17 +730,152 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
 
   private renderMarkers(items: Visit[]): void {
     this.visitLayer.clearLayers();
-    const located = items.filter(visit => this.validCoordinates(visit.latitude, visit.longitude));
+    const saved = items.map((visit) => ({ visit, createdAt: visit.createdAt, pending: false }));
+    const pending = this.offlineQueue.pendingItems()
+      .map((item) => ({ visit: item.visit, createdAt: item.createdAt, pending: true }));
+    const located = [...saved, ...pending]
+      .filter(({ visit }) => this.validCoordinates(visit.latitude, visit.longitude));
     const visible = typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches
       ? located.slice(0, 60)
       : located;
-    visible.forEach((visit) => {
-      L.circleMarker([Number(visit.latitude), Number(visit.longitude)], {
+    visible.forEach(({ visit, createdAt, pending: isPending }) => {
+      const coordinates: L.LatLngTuple = [Number(visit.latitude), Number(visit.longitude)];
+      const photoSource = this.visitPhotoSource(visit);
+      const popup = this.visitPopup(visit, createdAt, photoSource, isPending);
+      if (photoSource) {
+        L.marker(coordinates, {
+          icon: this.photoMarkerIcon(visit.wantsVisits),
+          title: `${visit.personName} - foto registrada`
+        }).bindPopup(popup, { maxWidth: 280 }).addTo(this.visitLayer);
+        return;
+      }
+      L.circleMarker(coordinates, {
         radius: 7,
         color: this.cssColor(visit.wantsVisits ? '--color-success' : '--color-error'),
         fillOpacity: 0.8
-      }).bindPopup(`<strong>${visit.personName}</strong><br>${visit.neighborhood ?? visit.city}<br>${visit.wantsVisits ? 'Aceita visitas' : 'Nao aceita visitas'}`).addTo(this.visitLayer);
+      }).bindPopup(popup, { maxWidth: 280 }).addTo(this.visitLayer);
     });
+  }
+
+  private visitPopup(visit: Visit, createdAt: string | undefined, photoSource: string | null, pending: boolean): HTMLElement {
+    const popup = document.createElement('article');
+    popup.className = 'visit-map-popup';
+
+    const name = document.createElement('strong');
+    name.textContent = visit.personName || 'Pessoa não identificada';
+    popup.appendChild(name);
+
+    const date = document.createElement('span');
+    date.textContent = `Visita: ${this.formatDate(createdAt)}`;
+    popup.appendChild(date);
+
+    const address = document.createElement('span');
+    address.textContent = this.visitAddress(visit);
+    popup.appendChild(address);
+
+    if (pending) {
+      const status = document.createElement('small');
+      status.textContent = 'Pendente de sincronização';
+      popup.appendChild(status);
+    }
+
+    if (!photoSource) {
+      const noPhoto = document.createElement('span');
+      noPhoto.className = 'visit-map-no-photo';
+      noPhoto.textContent = 'Sem foto registrada';
+      popup.appendChild(noPhoto);
+      return popup;
+    }
+
+    const thumbnail = document.createElement('button');
+    thumbnail.type = 'button';
+    thumbnail.className = 'visit-map-photo-button';
+    thumbnail.setAttribute('aria-label', `Ampliar foto de ${visit.personName}`);
+    const image = document.createElement('img');
+    image.src = photoSource;
+    image.alt = `Foto da visita de ${visit.personName}`;
+    const imageError = document.createElement('span');
+    imageError.className = 'visit-map-photo-error';
+    imageError.textContent = 'Não foi possível carregar a foto.';
+    imageError.hidden = true;
+    image.addEventListener('error', () => {
+      image.hidden = true;
+      imageError.hidden = false;
+      thumbnail.disabled = true;
+    });
+    thumbnail.addEventListener('click', (event) => {
+      event.preventDefault();
+      this.zone.run(() => this.openPhoto(photoSource, visit.personName));
+    });
+    thumbnail.append(image, imageError);
+    popup.appendChild(thumbnail);
+    return popup;
+  }
+
+  private visitAddress(visit: Visit): string {
+    if (visit.manualAddress?.trim()) {
+      return visit.manualAddress.trim();
+    }
+    const street = [visit.street, visit.number].filter(Boolean).join(', ');
+    const address = [street, visit.neighborhood, visit.city].filter(Boolean).join(' - ');
+    return address || `Coordenadas: ${Number(visit.latitude).toFixed(6)}, ${Number(visit.longitude).toFixed(6)}`;
+  }
+
+  private visitPhotoSource(visit: Visit): string | null {
+    const photoUrl = this.safeImageSource(visit.photoUrl);
+    if (photoUrl) {
+      return photoUrl;
+    }
+    const photo = visit.photoData as unknown;
+    if (photo instanceof Blob) {
+      let url = this.photoBlobUrls.get(photo);
+      if (!url) {
+        url = URL.createObjectURL(photo);
+        this.photoBlobUrls.set(photo, url);
+        this.createdPhotoUrls.add(url);
+      }
+      return url;
+    }
+    const photoData = this.safeImageSource(typeof photo === 'string' ? photo : undefined);
+    if (photoData) {
+      return photoData;
+    }
+    if (typeof photo === 'string' && /^[A-Za-z0-9+/=\s]+$/.test(photo) && photo.trim().length > 32) {
+      return `data:${visit.photoContentType || 'image/jpeg'};base64,${photo.replace(/\s/g, '')}`;
+    }
+    return null;
+  }
+
+  private safeImageSource(value?: string): string | null {
+    const source = value?.trim();
+    return source && (/^https:\/\//i.test(source) || /^data:image\/[a-z0-9.+-]+;base64,/i.test(source))
+      ? source
+      : null;
+  }
+
+  private photoMarkerIcon(wantsVisits: boolean): L.DivIcon {
+    const color = this.cssColor(wantsVisits ? '--color-success' : '--color-error');
+    return L.divIcon({
+      className: 'visit-photo-marker-wrapper',
+      html: `<span class="visit-photo-map-marker" style="--visit-marker-color:${color}" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8.5 5 10 3h4l1.5 2H19a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3h3.5ZM12 8a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Zm0 2a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z"/></svg></span>`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+      popupAnchor: [0, -14]
+    });
+  }
+
+  private openPhoto(src: string, personName: string): void {
+    this.photoLoadFailed.set(false);
+    this.photoViewer.set({
+      src,
+      alt: `Foto da visita de ${personName}`,
+      title: personName || 'Foto da visita'
+    });
+  }
+
+  closePhoto(): void {
+    this.photoViewer.set(null);
+    this.photoLoadFailed.set(false);
   }
 
   private renderTerritories(): void {
@@ -877,7 +1035,10 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.offlineQueue.remove(id)
-      .then(() => this.notifications.info('Ficha pendente excluída do aparelho.'))
+      .then(() => {
+        this.renderMarkers(this.visits());
+        this.notifications.info('Ficha pendente excluída do aparelho.');
+      })
       .catch(() => this.fail('Não foi possível excluir a ficha pendente.'));
   }
 
@@ -900,6 +1061,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       this.saving.set(false);
       this.ok('Sem conexão. A ficha foi salva no aparelho e será enviada quando a internet voltar.');
       this.resetForm();
+      this.renderMarkers(this.visits());
     }).catch(() => {
       this.saving.set(false);
       this.fail('Não foi possível salvar a ficha no aparelho. Os campos foram mantidos para você tentar novamente.');
@@ -912,7 +1074,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
 
   private handleOnline = (): void => {
     this.online.set(true);
-    this.offlineQueue.refreshCount();
+    this.offlineQueue.refreshCount().then(() => this.renderMarkers(this.visits()));
   };
 
   private handleOffline = (): void => {
