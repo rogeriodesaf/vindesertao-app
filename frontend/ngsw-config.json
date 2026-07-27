@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/@angular/service-worker/config/schema.json",
   "appData": {
-    "version": "offline-sync-v2"
+    "version": "offline-map-rio-tinto-v1"
   },
   "index": "/index.html",
   "assetGroups": [
@@ -14,6 +14,16 @@
           "/manifest.webmanifest",
           "/*.css",
           "/*.js"
+        ]
+      }
+    },
+    {
+      "name": "offline-city-map",
+      "installMode": "prefetch",
+      "updateMode": "prefetch",
+      "resources": {
+        "files": [
+          "/assets/maps/rio-tinto-pb.pmtiles"
         ]
       }
     },

@@ -4,12 +4,16 @@ import { SlicePipe } from '@angular/common';
 import { AfterViewInit, Component, NgZone, OnDestroy, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import * as L from 'leaflet';
+import { FileSource, PMTiles } from 'pmtiles';
+import { leafletLayer } from 'protomaps-leaflet';
 import { finalize } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { formatDateTime } from '../core/date-format';
+import { missionCityMap } from '../core/mission-city.config';
 import { Territory, Visit } from '../core/models';
 import { NotificationService } from '../core/notification.service';
+import { OfflineMapCacheService } from '../core/offline-map-cache.service';
 import { normalizeOfflineVisit, OfflineVisitQueueService } from '../core/offline-visit-queue.service';
 import { EmptyStateComponent } from '../shared/empty-state.component';
 import { ListCardComponent, ListCardInfo } from '../shared/list-card.component';
@@ -277,10 +281,19 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   private territoryLayer = L.layerGroup();
   private refreshHandle?: ReturnType<typeof setInterval>;
   private mapTileWarningShown = false;
+  private offlineMapNoticeShown = false;
   private photoBlobUrls = new WeakMap<Blob, string>();
   private createdPhotoUrls = new Set<string>();
 
-  constructor(public api: ApiService, private http: HttpClient, private auth: AuthService, private zone: NgZone, private notifications: NotificationService, public offlineQueue: OfflineVisitQueueService) {}
+  constructor(
+    public api: ApiService,
+    private http: HttpClient,
+    private auth: AuthService,
+    private zone: NgZone,
+    private notifications: NotificationService,
+    private offlineMapCache: OfflineMapCacheService,
+    public offlineQueue: OfflineVisitQueueService
+  ) {}
 
   ngAfterViewInit(): void {
     if (!window.matchMedia('(max-width: 900px)').matches) this.initializeMap();
@@ -296,17 +309,15 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
 
   private initializeMap(): void {
     if (this.map) return;
-    this.map = L.map('visit-map', { zoomControl: false }).setView([-7.229, -39.313], 13);
+    this.map = L.map('visit-map', {
+      zoomControl: false,
+      minZoom: missionCityMap.minZoom,
+      maxZoom: missionCityMap.maxZoom,
+      maxBounds: missionCityMap.bounds,
+      maxBoundsViscosity: 0.9
+    }).setView(missionCityMap.center, missionCityMap.initialZoom);
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap'
-    }).on('tileerror', () => {
-      if (!this.mapTileWarningShown) {
-        this.mapTileWarningShown = true;
-        this.notifications.info('O mapa não pôde carregar completamente. O formulário continua disponível.');
-      }
-    }).addTo(this.map);
+    this.addOfflineCityLayer();
     this.territoryLayer.addTo(this.map);
     this.visitLayer.addTo(this.map);
     this.map.on('click', (event: L.LeafletMouseEvent) => {
@@ -319,6 +330,40 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     }
     this.renderTerritories();
     this.renderMarkers(this.visits());
+  }
+
+  private async addOfflineCityLayer(): Promise<void> {
+    if (!this.map) {
+      return;
+    }
+    try {
+      const response = await fetch(missionCityMap.mapArchiveUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const archive = new File(
+        [await response.blob()],
+        `${missionCityMap.id}-${missionCityMap.mapDataVersion}.pmtiles`,
+        { type: 'application/vnd.pmtiles' }
+      );
+      const offlineCityLayer = leafletLayer({
+        url: new PMTiles(new FileSource(archive)),
+        flavor: 'light',
+        lang: 'pt',
+        bounds: missionCityMap.bounds,
+        minZoom: missionCityMap.minZoom,
+        maxZoom: missionCityMap.maxZoom,
+        maxDataZoom: missionCityMap.maxDataZoom,
+        noWrap: true,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | <a href="https://protomaps.com">Protomaps</a>'
+      });
+      offlineCityLayer['addTo'](this.map);
+    } catch {
+      if (!this.mapTileWarningShown) {
+        this.mapTileWarningShown = true;
+        this.notifications.info(`O mapa offline de ${missionCityMap.name} não pôde carregar completamente.`);
+      }
+    }
   }
 
   ngOnDestroy(): void {
@@ -337,6 +382,10 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     if (this.loadingVisits()) {
       return;
     }
+    if (!this.online()) {
+      this.loadCachedVisits();
+      return;
+    }
     this.loadingVisits.set(true);
     this.api.visits({ page: 0, size: 100, neighborhood: this.filters.neighborhood, wantsVisits: this.filters.wantsVisits || undefined })
       .pipe(finalize(() => this.loadingVisits.set(false)))
@@ -345,13 +394,19 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
           this.visits.set(page.items);
           this.renderMarkers(page.items);
           this.refreshMapView();
+          this.offlineMapCache.saveVisits(page.items)
+            .catch((error) => console.warn('[Mapa offline] Não foi possível salvar as visitas:', error));
         },
-        error: () => this.fail('Não foi possível carregar as visitas. O formulário continua disponível.')
+        error: () => this.loadCachedVisits(true)
       });
   }
 
   loadTerritories(): void {
     if (this.loadingTerritories()) {
+      return;
+    }
+    if (!this.online()) {
+      this.loadCachedTerritories();
       return;
     }
     this.loadingTerritories.set(true);
@@ -361,9 +416,49 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         this.renderTerritories();
         this.updateTerritoryStatus();
         this.refreshMapView();
+        this.offlineMapCache.saveTerritories(territories)
+          .catch((error) => console.warn('[Mapa offline] Não foi possível salvar os territórios:', error));
       },
-      error: () => this.notifications.error('Não foi possível carregar os territórios. Tente novamente mais tarde.')
+      error: () => this.loadCachedTerritories(true)
     });
+  }
+
+  private loadCachedVisits(requestFailed = false): void {
+    this.offlineMapCache.loadVisits().then((items) => {
+      if (items.length) {
+        this.visits.set(items);
+        this.renderMarkers(items);
+        this.refreshMapView();
+        this.showOfflineMapNotice();
+        return;
+      }
+      if (requestFailed) {
+        this.fail('Não foi possível carregar as visitas e ainda não há uma cópia offline neste aparelho.');
+      }
+    });
+  }
+
+  private loadCachedTerritories(requestFailed = false): void {
+    this.offlineMapCache.loadTerritories().then((territories) => {
+      if (territories.length) {
+        this.territories.set(territories);
+        this.renderTerritories();
+        this.updateTerritoryStatus();
+        this.refreshMapView();
+        this.showOfflineMapNotice();
+        return;
+      }
+      if (requestFailed) {
+        this.notifications.error('Não foi possível carregar os territórios e ainda não há uma cópia offline neste aparelho.');
+      }
+    });
+  }
+
+  private showOfflineMapNotice(): void {
+    if (!this.offlineMapNoticeShown) {
+      this.offlineMapNoticeShown = true;
+      this.notifications.info(`Exibindo a última cópia salva do mapa de ${missionCityMap.name}.`);
+    }
   }
 
   searchAddress(): void {
@@ -971,7 +1066,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
 
   private openVisitDetails(visit: Visit): void {
     this.setVisitDetails(visit);
-    if (!visit.id) {
+    if (!visit.id || !this.online()) {
       return;
     }
     this.api.visit(visit.id).subscribe({
@@ -1188,6 +1283,9 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
 
   private handleOnline = (): void => {
     this.online.set(true);
+    this.offlineMapNoticeShown = false;
+    this.loadVisits();
+    this.loadTerritories();
     this.offlineQueue.refreshCount().then(() => this.renderMarkers(this.visits()));
   };
 
