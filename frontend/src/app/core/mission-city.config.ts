@@ -1,16 +1,17 @@
-import type { LatLngBoundsExpression, LatLngExpression } from 'leaflet';
+import type { LatLngBoundsLiteral, LatLngExpression } from 'leaflet';
 
 export interface MissionCityMapProfile {
   id: string;
   name: string;
   center: LatLngExpression;
-  bounds: LatLngBoundsExpression;
+  bounds: LatLngBoundsLiteral;
   initialZoom: number;
   minZoom: number;
   maxZoom: number;
   maxDataZoom: number;
   mapArchiveUrl: string;
   mapDataVersion: string;
+  searchTerms: string[];
 }
 
 export const missionCityMap: MissionCityMapProfile = {
@@ -23,5 +24,6 @@ export const missionCityMap: MissionCityMapProfile = {
   maxZoom: 18,
   maxDataZoom: 15,
   mapArchiveUrl: '/assets/maps/rio-tinto-pb.pmtiles',
-  mapDataVersion: '2026-07-27'
+  mapDataVersion: '2026-07-27',
+  searchTerms: ['rio tinto', 'rio tinto pb', 'rio tinto paraiba']
 };

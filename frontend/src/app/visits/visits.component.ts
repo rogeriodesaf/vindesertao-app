@@ -282,6 +282,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   private refreshHandle?: ReturnType<typeof setInterval>;
   private mapTileWarningShown = false;
   private offlineMapNoticeShown = false;
+  private missionCityBounds = L.latLngBounds(missionCityMap.bounds);
   private photoBlobUrls = new WeakMap<Blob, string>();
   private createdPhotoUrls = new Set<string>();
 
@@ -465,6 +466,16 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     if (!this.searchText.trim()) {
       return;
     }
+    if (this.isMissionCitySearch(this.searchText)) {
+      this.centerMissionCity();
+      this.message.set(`Mapa de ${missionCityMap.name} centralizado.`);
+      this.notifications.info(this.message());
+      return;
+    }
+    if (!this.online()) {
+      this.notifications.info(`A busca de ruas precisa de internet. O mapa de ${missionCityMap.name} continua disponível offline.`);
+      return;
+    }
     if (this.searchingAddress()) {
       return;
     }
@@ -642,6 +653,18 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     navigator.geolocation.getCurrentPosition(
       position => this.zone.run(() => {
         const point: L.LatLngTuple = [position.coords.latitude, position.coords.longitude];
+        if (!this.missionCityBounds.contains(point)) {
+          this.userCoordinates = undefined;
+          this.userLocationMarker?.remove();
+          this.userLocationMarker = undefined;
+          this.locatingMap.set(false);
+          this.mapLocationMessage.set(`Você está fora da área de ${missionCityMap.name}. O mapa da missão foi mantido.`);
+          this.centerMissionCity();
+          if (centerMap) {
+            this.notifications.info(this.mapLocationMessage());
+          }
+          return;
+        }
         this.userCoordinates = point;
         if (this.userLocationMarker) this.userLocationMarker.setLatLng(point);
         else {
@@ -1115,16 +1138,28 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   private refreshMapView(): void {
     if (!this.map) return;
     const points: L.LatLngTuple[] = this.visits()
-      .filter(visit => this.validCoordinates(visit.latitude, visit.longitude))
+      .filter(visit => this.validCoordinates(visit.latitude, visit.longitude)
+        && this.missionCityBounds.contains([Number(visit.latitude), Number(visit.longitude)]))
       .map(visit => [Number(visit.latitude), Number(visit.longitude)]);
-    if (this.userCoordinates) points.push(this.userCoordinates);
+    if (this.userCoordinates && this.missionCityBounds.contains(this.userCoordinates)) {
+      points.push(this.userCoordinates);
+    }
     if (points.length > 1) {
       this.map.fitBounds(L.latLngBounds(points), { padding: [30, 30], maxZoom: 17 });
     } else if (points.length === 1) {
       this.map.setView(points[0], 16);
     } else {
-      this.map.setView([-7.229, -39.313], 13);
+      this.centerMissionCity();
     }
+  }
+
+  private centerMissionCity(): void {
+    this.map?.setView(missionCityMap.center, missionCityMap.initialZoom);
+  }
+
+  private isMissionCitySearch(value: string): boolean {
+    const normalized = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+    return missionCityMap.searchTerms.some((term) => normalized === term || normalized.includes(term));
   }
 
   private validCoordinates(latitude: unknown, longitude: unknown): boolean {
