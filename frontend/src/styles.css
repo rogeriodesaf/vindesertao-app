@@ -611,6 +611,20 @@ h2 { font-size: 17px; }
   font-weight: 700;
   box-shadow: var(--shadow);
 }
+.territory-status-short { display: none; }
+.territory-status-dismiss {
+  width: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: currentColor;
+  font-size: 20px;
+  line-height: 1;
+  box-shadow: none;
+}
 .territory-status.outside { border-color: var(--color-warning); background: var(--color-warning-surface); color: var(--color-warning); }
 .photo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .visually-hidden {
@@ -1423,6 +1437,9 @@ tbody tr:hover { background: var(--color-hover); }
     overflow: visible;
   }
   app-visits .workspace.mobile-map-view .map-panel {
+    --map-mobile-edge: clamp(10px, 3.5vw, 16px);
+    --map-mobile-controls-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    --map-mobile-notice-bottom: calc(94px + env(safe-area-inset-bottom, 0px));
     position: relative;
     width: 100%;
     height: calc(100dvh - 184px - env(safe-area-inset-bottom));
@@ -1437,8 +1454,8 @@ tbody tr:hover { background: var(--color-hover); }
   app-visits .map-location-button {
     position: absolute;
     z-index: 700;
-    left: 14px;
-    bottom: calc(34px + env(safe-area-inset-bottom));
+    left: var(--map-mobile-edge);
+    bottom: var(--map-mobile-controls-bottom);
     width: 46px;
     min-width: 46px;
     min-height: 46px;
@@ -1462,6 +1479,32 @@ tbody tr:hover { background: var(--color-hover); }
     color: var(--text);
     box-shadow: var(--shadow);
     font-size: 12px;
+  }
+  app-visits .leaflet-bottom.leaflet-right {
+    right: calc(var(--map-mobile-edge) - 10px);
+    bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  }
+  app-visits .territory-status {
+    z-index: 550;
+    left: var(--map-mobile-edge);
+    right: var(--map-mobile-edge);
+    bottom: var(--map-mobile-notice-bottom);
+    width: auto;
+    max-width: none;
+    height: auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 28px;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 8px 9px 12px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+  app-visits .territory-status-dismiss {
+    width: 28px;
+    min-width: 28px;
+    min-height: 28px;
   }
   app-visits .leaflet-control-attribution {
     max-width: calc(100vw - 90px);
@@ -1666,6 +1709,11 @@ tbody tr:hover { background: var(--color-hover); }
 
 @media (max-width: 429.98px) {
   app-visits .map-summary-card .muted { display: none; }
+}
+
+@media (max-width: 359.98px) {
+  app-visits .territory-status-full { display: none; }
+  app-visits .territory-status-short { display: inline; }
 }
 
 @media print {

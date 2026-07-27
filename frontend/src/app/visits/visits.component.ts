@@ -49,8 +49,15 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v3m0 14v3M2 12h3m14 0h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"></path></svg>
         </button>
         @if (mapLocationMessage()) { <div class="map-location-message">{{ mapLocationMessage() }}</div> }
-        @if (territoryStatus()) {
-          <div class="territory-status" [class.outside]="territoryOutside()">{{ territoryStatus() }}</div>
+        @if (territoryStatus() && !territoryNoticeDismissed()) {
+          <div class="territory-status" [class.outside]="territoryOutside()" role="status">
+            <span>
+              <span class="territory-status-full">Apenas territórios autorizados são exibidos. As restrições serão aplicadas ao salvar.</span>
+              <span class="territory-status-short">Apenas territórios autorizados são exibidos.</span>
+            </span>
+            <button type="button" class="territory-status-dismiss" aria-label="Fechar aviso de territórios"
+              (click)="dismissTerritoryNotice()">×</button>
+          </div>
         }
       </div>
 
@@ -261,6 +268,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   mapLocationMessage = signal('');
   territoryStatus = signal('');
   territoryOutside = signal(false);
+  territoryNoticeDismissed = signal(this.isTerritoryNoticeDismissed());
   openSection = signal<VisitFormSection | null>('basic');
   sectionError = signal<VisitFormSection | null>(null);
   locationActionsOpen = signal(false);
@@ -297,6 +305,24 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     private offlineMapCache: OfflineMapCacheService,
     public offlineQueue: OfflineVisitQueueService
   ) {}
+
+  dismissTerritoryNotice(): void {
+    this.territoryNoticeDismissed.set(true);
+    try {
+      sessionStorage.setItem('visit-map-territory-notice-dismissed', 'true');
+    } catch {
+      // O aviso continua fechado enquanto esta instância da tela estiver ativa.
+    }
+  }
+
+  private isTerritoryNoticeDismissed(): boolean {
+    try {
+      return typeof sessionStorage !== 'undefined'
+        && sessionStorage.getItem('visit-map-territory-notice-dismissed') === 'true';
+    } catch {
+      return false;
+    }
+  }
 
   ngAfterViewInit(): void {
     if (!window.matchMedia('(max-width: 900px)').matches) this.initializeMap();
