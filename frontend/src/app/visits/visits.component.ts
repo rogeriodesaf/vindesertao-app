@@ -16,7 +16,7 @@ import { NotificationService } from '../core/notification.service';
 import { OfflineMapCacheService } from '../core/offline-map-cache.service';
 import { normalizeOfflineVisit, OfflineVisitQueueService } from '../core/offline-visit-queue.service';
 import { EmptyStateComponent } from '../shared/empty-state.component';
-import { ListCardComponent, ListCardInfo } from '../shared/list-card.component';
+import { ListCardAction, ListCardComponent, ListCardInfo } from '../shared/list-card.component';
 import { FormSectionComponent } from '../shared/form-section.component';
 import { DatePickerComponent } from '../shared/date-picker.component';
 import { DateRangeFilterComponent } from '../shared/date-range-filter.component';
@@ -99,7 +99,7 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
           }
         }
 
-        @if (canManageVisits()) {
+        @if (canModifyVisit()) {
           <h2 class="visit-form-title">{{ editingId() ? 'Editar visita' : 'Nova visita' }}</h2>
           <form #visitForm="ngForm" class="visit-accordion-form" novalidate (ngSubmit)="save(visitForm)">
             <app-form-section title="Informações básicas" subtitle="Dados principais da visita" icon="person" tone="cyan" sectionId="visit-basic"
@@ -161,7 +161,9 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
                 <app-date-range-filter class="visit-date-filter" [(from)]="filters.from" [(to)]="filters.to"
                   valueMode="datetime" [loading]="loadingVisits()" (filter)="loadVisits()" (clear)="loadVisits()" />
               </div>
-              <div class="visit-list unified-list">@for (visit of visits(); track visit.id) { <app-list-card [title]="visit.personName" [interactive]="true" (activate)="selectVisit(visit)" [infos]="visitCardInfos(visit)" /> } @empty { <app-empty-state message="Nenhuma visita encontrada." /> }</div>
+              <div class="visit-list unified-list">@for (visit of visits(); track visit.id) { <app-list-card [title]="visit.personName" [interactive]="true"
+                [actions]="visitActions(visit)" [actionsInline]="true" (activate)="selectVisit(visit)"
+                (action)="handleVisitAction(visit, $event)" [infos]="visitCardInfos(visit)" /> } @empty { <app-empty-state message="Nenhuma visita encontrada." /> }</div>
             </app-form-section>
             @if (message()) {
               <p class="success">{{ message() }}</p>
@@ -171,7 +173,7 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
             }
             <div class="actions visit-form-actions">
               <button type="submit" class="save-visit" [class.loading]="saving()" [disabled]="saving()">{{ saving() ? 'Salvando...' : 'Salvar visita' }}</button>
-              <button type="button" class="secondary" [disabled]="saving()" (click)="resetForm()">Limpar</button>
+              <button type="button" class="secondary" [disabled]="saving()" (click)="resetForm()">{{ isAdmin() ? 'Cancelar edição' : 'Limpar' }}</button>
             </div>
           </form>
           @if (locationActionsOpen()) {
@@ -192,7 +194,7 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
           </section>
         }
 
-        @if (!canManageVisits()) {
+        @if (!canManageVisits() && !adminEditing()) {
           <div class="filters">
             <h2>{{ visitListTitle() }}</h2>
             <div class="form-grid">
@@ -204,7 +206,9 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
             <app-date-range-filter class="visit-date-filter" [(from)]="filters.from" [(to)]="filters.to"
               valueMode="datetime" [loading]="loadingVisits()" (filter)="loadVisits()" (clear)="loadVisits()" />
           </div>
-          <div class="visit-list unified-list">@for (visit of visits(); track visit.id) { <app-list-card [title]="visit.personName" [interactive]="true" (activate)="selectVisit(visit)" [infos]="visitCardInfos(visit)" /> } @empty { <app-empty-state message="Nenhuma visita encontrada." /> }</div>
+          <div class="visit-list unified-list">@for (visit of visits(); track visit.id) { <app-list-card [title]="visit.personName" [interactive]="true"
+            [actions]="visitActions(visit)" [actionsInline]="true" (activate)="selectVisit(visit)"
+            (action)="handleVisitAction(visit, $event)" [infos]="visitCardInfos(visit)" /> } @empty { <app-empty-state message="Nenhuma visita encontrada." /> }</div>
         }
       </aside>
     </section>
@@ -286,6 +290,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   loadingTerritories = signal(false);
   searchingAddress = signal(false);
   exporting = signal(false);
+  deletingId = signal<number | null>(null);
   pendingOpen = signal(false);
   mobileView = signal<'form' | 'map'>('form');
   geolocationState = signal<'idle' | 'loading' | 'success' | 'denied' | 'unavailable' | 'timeout'>('idle');
@@ -376,7 +381,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.territoryLayer.addTo(this.map);
     this.visitLayer.addTo(this.map);
     this.map.on('click', (event: L.LeafletMouseEvent) => {
-      if (this.canManageVisits()) {
+      if (this.canModifyVisit()) {
         this.selectPoint(event.latlng.lat, event.latlng.lng);
       }
     });
@@ -571,16 +576,16 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       next: (results) => {
         const first = results[0];
         if (!first) {
-          if (this.canManageVisits()) {
+          if (this.canModifyVisit()) {
             this.form.manualAddress = this.searchText;
           }
-          this.message.set(this.canManageVisits()
+          this.message.set(this.canModifyVisit()
             ? 'Endereço não encontrado. Preencha manualmente e salve.'
             : 'Endereço não encontrado.');
           this.notifications.info(this.message());
           return;
         }
-        if (this.canManageVisits()) {
+        if (this.canModifyVisit()) {
           this.form.manualAddress = first.display_name;
           this.selectPoint(Number(first.lat), Number(first.lon));
           this.locationSource.set('address');
@@ -615,9 +620,13 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       ? this.api.updateVisit(this.editingId() as number, payload)
       : this.api.createVisit(payload);
     action.subscribe({
-      next: () => {
+      next: (savedVisit) => {
         this.saving.set(false);
         this.ok(editing ? 'Ficha de visita atualizada com sucesso.' : 'Ficha de visita salva com sucesso.');
+        if (editing) {
+          this.visits.update(items => items.map(item => item.id === savedVisit.id ? savedVisit : item));
+          this.renderMarkers(this.visits());
+        }
         this.resetForm();
         this.loadVisits();
       },
@@ -630,16 +639,55 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.api.visit(visit.id).subscribe((fullVisit) => {
+      const editingAsAdmin = this.isAdmin();
       this.form = { ...fullVisit };
       this.editingId.set(fullVisit.id ?? null);
+      this.mobileView.set('form');
       this.openSection.set('basic');
       if (fullVisit.latitude && fullVisit.longitude) {
-      this.selectPoint(fullVisit.latitude, fullVisit.longitude);
-      this.locationSource.set('manual');
+        this.selectPoint(fullVisit.latitude, fullVisit.longitude);
+        this.locationSource.set('manual');
         this.map?.setView([fullVisit.latitude, fullVisit.longitude], 17);
-        this.scrollMapIntoView();
+        if (!editingAsAdmin) this.scrollMapIntoView();
+      }
+      if (editingAsAdmin) {
+        requestAnimationFrame(() => document.querySelector('.visit-form-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
       }
     });
+  }
+
+  deleteVisit(visit: Visit): void {
+    if (!this.isAdmin() || !visit.id || this.deletingId()) return;
+    if (!window.confirm(`Excluir a visita de ${visit.personName}? Esta ação não pode ser desfeita.`)) return;
+    this.deletingId.set(visit.id);
+    this.api.deleteVisit(visit.id).pipe(finalize(() => this.deletingId.set(null))).subscribe({
+      next: () => {
+        this.visits.update(items => items.filter(item => item.id !== visit.id));
+        this.renderMarkers(this.visits());
+        this.closeVisitDetails();
+        this.notifications.success('Visita excluída com sucesso.');
+        this.loadVisits();
+      },
+      error: () => this.fail('Não foi possível excluir a visita.')
+    });
+  }
+
+  visitActions(visit: Visit): ListCardAction[] {
+    if (!this.isAdmin()) return [];
+    return [
+      { id: 'edit', label: 'Editar', icon: 'edit' },
+      {
+        id: 'delete',
+        label: this.deletingId() === visit.id ? 'Excluindo...' : 'Excluir',
+        icon: 'delete',
+        danger: true
+      }
+    ];
+  }
+
+  handleVisitAction(visit: Visit, action: string): void {
+    if (action === 'edit') this.edit(visit);
+    if (action === 'delete') this.deleteVisit(visit);
   }
 
   selectVisit(visit: Visit): void {
@@ -934,6 +982,18 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   canManageVisits(): boolean {
     const user = this.auth.user();
     return !!user && !user.roles.includes('admin') && user.canRegisterVisits;
+  }
+
+  isAdmin(): boolean {
+    return !!this.auth.user()?.roles.includes('admin');
+  }
+
+  adminEditing(): boolean {
+    return this.isAdmin() && !!this.editingId();
+  }
+
+  canModifyVisit(): boolean {
+    return this.canManageVisits() || this.adminEditing();
   }
 
   canEditVisit(visit: Visit): boolean {
@@ -1235,7 +1295,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
           weight: selected ? 4 : 2
         }).bindPopup(`<strong>${territory.name}</strong><br>${territory.teamName}`);
         polygon.on('click', (event: L.LeafletMouseEvent) => {
-          if (this.canManageVisits()) {
+          if (this.canModifyVisit()) {
             this.selectPoint(event.latlng.lat, event.latlng.lng);
           }
         });

@@ -5,6 +5,7 @@ import io.quarkus.panache.common.Parameters;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
+import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.NotFoundException;
 import org.vindesertao.audit.AuditService;
 import org.vindesertao.auth.CurrentUser;
@@ -61,11 +62,12 @@ public class VisitService {
     @Transactional
     public HouseholdVisit update(Long id, VisitDtos.VisitRequest request) {
         AppUser user = currentUser.entity();
-        if (!currentUser.isLeader()) {
-            throw new IllegalArgumentException("Somente o lider da equipe pode editar fichas ja cadastradas.");
+        boolean admin = currentUser.isAdmin();
+        if (!admin && !currentUser.isLeader()) {
+            throw new ForbiddenException("Somente administradores ou lideres de equipe podem editar fichas ja cadastradas.");
         }
-        Team visitTeam = resolveVisitTeam(user);
         HouseholdVisit visit = getAllowed(id, true, user);
+        Team visitTeam = admin ? visit.team : resolveVisitTeam(user);
         String before = snapshot(visit);
         apply(request, visit);
         validateTerritoryRule(user, visit, visitTeam);
@@ -73,6 +75,17 @@ public class VisitService {
         visit.updatedBy = user.email;
         auditService.log("UPDATE", "VISIT", visit.id, before, snapshot(visit));
         return visit;
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        if (!currentUser.isAdmin()) {
+            throw new ForbiddenException("Somente administradores podem excluir fichas de visita.");
+        }
+        HouseholdVisit visit = getAllowed(id, true, currentUser.entity());
+        String before = snapshot(visit);
+        visits.delete(visit);
+        auditService.log("DELETE", "VISIT", id, before, null);
     }
 
     public HouseholdVisit getAllowed(Long id, boolean edit, AppUser user) {

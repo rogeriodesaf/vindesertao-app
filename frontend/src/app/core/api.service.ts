@@ -23,6 +23,10 @@ export class ApiService {
     return this.http.put<Visit>(`${environment.apiBaseUrl}/visits/${id}`, visit);
   }
 
+  deleteVisit(id: number) {
+    return this.http.delete<void>(`${environment.apiBaseUrl}/visits/${id}`);
+  }
+
   dashboard(params: Record<string, string | undefined>) {
     return this.http.get<Dashboard>(`${environment.apiBaseUrl}/analytics/dashboard`, { params: this.params(params) });
   }

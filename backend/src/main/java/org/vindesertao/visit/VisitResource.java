@@ -78,6 +78,14 @@ public class VisitResource {
         return VisitDtos.VisitResponse.from(visitService.update(id, request));
     }
 
+    @DELETE
+    @Path("/{id}")
+    @RolesAllowed("admin")
+    public Response delete(@PathParam("id") Long id) {
+        visitService.delete(id);
+        return Response.noContent().build();
+    }
+
     @GET
     @Path("/export.csv")
     @Produces("text/csv")
