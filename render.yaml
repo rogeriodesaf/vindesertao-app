@@ -16,6 +16,8 @@ services:
         value: https://vindesertao-app.onrender.com
       - key: JWT_ISSUER
         value: vinde-sertao
+      - key: JWT_EXPIRATION_HOURS
+        value: "24"
       - key: JWT_PRIVATE_KEY_LOCATION
         value: /etc/secrets/privateKey.pem
       - key: CLOUDINARY_CLOUD_NAME

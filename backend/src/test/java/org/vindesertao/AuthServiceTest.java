@@ -23,6 +23,7 @@ class AuthServiceTest {
 
         assertTrue(response.isPresent());
         assertNotNull(response.get().token());
+        assertEquals(24 * 60 * 60, response.get().expiresIn());
         assertTrue(response.get().user().roles().contains("admin"));
     }
 

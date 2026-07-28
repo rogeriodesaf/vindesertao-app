@@ -14,13 +14,14 @@ import java.util.Optional;
 
 @ApplicationScoped
 public class AuthService {
-    private static final Duration TOKEN_TTL = Duration.ofHours(10);
-
     @Inject
     UserRepository users;
 
     @ConfigProperty(name = "mp.jwt.verify.issuer")
     String issuer;
+
+    @ConfigProperty(name = "app.jwt.expiration-hours", defaultValue = "24")
+    long tokenExpirationHours;
 
     public Optional<LoginResponse> login(LoginRequest request) {
         return users.findByEmail(request.email())
@@ -54,7 +55,8 @@ public class AuthService {
     }
 
     public LoginResponse toResponse(AppUser user) {
-        long expiresIn = TOKEN_TTL.toSeconds();
+        Duration tokenTtl = Duration.ofHours(Math.max(1, tokenExpirationHours));
+        long expiresIn = tokenTtl.toSeconds();
         var tokenBuilder = Jwt.issuer(issuer)
                 .subject(user.email)
                 .upn(user.email)
@@ -69,7 +71,7 @@ public class AuthService {
             tokenBuilder.claim("team_id", user.team.id);
         }
         String token = tokenBuilder
-                .expiresIn(TOKEN_TTL)
+                .expiresIn(tokenTtl)
                 .sign();
         return new LoginResponse(token, "Bearer", expiresIn,
                 new LoginResponse.UserPrincipal(user.id, user.name, user.email, user.roleSet(), user.team == null ? null : user.team.id,
