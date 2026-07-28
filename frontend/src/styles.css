@@ -44,8 +44,11 @@
   --color-surface-elevated: #273449;
   --color-text: #F3F4F6;
   --color-text-secondary: #CBD5E1;
-  --color-border: #435166;
+  --color-border: #64748B;
   --color-primary-readable: #9CCAD7;
+  --color-success: #81C784;
+  --color-warning: #FFB74D;
+  --color-error: #EF9A9A;
   --color-field: #182231;
   --color-hover: #29384B;
   --color-selected: #254958;
