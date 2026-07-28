@@ -215,7 +215,7 @@ public class VisitResource {
     private String sheetXml(List<HouseholdVisit> visits) {
         List<List<String>> rows = new ArrayList<>();
         rows.add(Arrays.asList("Nome", "Telefone", "Rua", "Numero", "Bairro", "Cidade",
-                "Aceita visitas", "Idade", "Moradores", "Ponto de referencia", "Pedido de oracao", "Proxima visita",
+                "Aceita visitas", "Idade", "Moradores", "Ponto de referencia", "Pedido de oracao", "Sugestao de proxima visita",
                 "Observacoes", "Foto anexada", "Foto", "Link do Street View", "Projetista", "Equipe", "Cadastrado em"));
         visits.forEach(visit -> rows.add(Arrays.asList(
                 text(visit.personName),

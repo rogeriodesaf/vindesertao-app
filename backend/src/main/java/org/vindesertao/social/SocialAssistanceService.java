@@ -191,7 +191,10 @@ public class SocialAssistanceService {
 
         Set<Long> visibleIds = visibleSocialTeamIds(user);
         if (visibleIds.isEmpty()) {
-            throw new IllegalArgumentException("Este usuario precisa estar vinculado a uma equipe de acao social.");
+            throw new IllegalArgumentException(
+                    "Você não está vinculado a uma equipe de Ação Social. "
+                            + "Solicite ao administrador esse vínculo antes de registrar atendimentos."
+            );
         }
         Long teamId = requestedTeamId != null && visibleIds.contains(requestedTeamId)
                 ? requestedTeamId

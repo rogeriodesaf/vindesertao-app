@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { HttpErrorResponse } from '@angular/common/http';
 import { SlicePipe } from '@angular/common';
-import { AfterViewInit, Component, NgZone, OnDestroy, signal } from '@angular/core';
+import { AfterViewInit, Component, NgZone, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule, NgForm } from '@angular/forms';
 import * as L from 'leaflet';
 import { FileSource, PMTiles } from 'pmtiles';
@@ -24,6 +24,12 @@ import { DateRangeFilterComponent } from '../shared/date-range-filter.component'
 type VisitFormSection = 'basic' | 'location' | 'photo' | 'more' | 'visits';
 type LocationSource = 'none' | 'gps' | 'map' | 'manual' | 'address';
 type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
+interface VisitFormDraft {
+  form: Visit;
+  editingId: number | null;
+  locationSource: LocationSource;
+  locationAccuracy: number | null;
+}
 
 @Component({
   selector: 'app-visits',
@@ -144,7 +150,10 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
               <label for="visit-address">Endereço manual<textarea id="visit-address" name="manualAddress" [(ngModel)]="form.manualAddress"></textarea></label>
               <div class="form-grid"><label for="visit-age">Idade<input id="visit-age" name="personAge" type="number" min="0" [(ngModel)]="form.personAge"></label><label for="visit-household">Moradores na casa<input id="visit-household" name="householdSize" type="number" min="0" [(ngModel)]="form.householdSize"></label></div>
               <label for="visit-reference">Ponto de referência<textarea id="visit-reference" name="referencePoint" [(ngModel)]="form.referencePoint"></textarea></label>
-              <label>Próxima visita<app-date-picker name="nextVisitAt" ariaLabel="Data e horário da próxima visita" [withTime]="true" [ngModel]="toLocalDateTime(form.nextVisitAt)" (ngModelChange)="setNextVisitAt($event)" /></label>
+              <label>Sugestão de próxima visita
+                <app-date-picker name="nextVisitAt" ariaLabel="Data e horário sugeridos para a próxima visita" [withTime]="true" [ngModel]="toLocalDateTime(form.nextVisitAt)" (ngModelChange)="setNextVisitAt($event)" />
+                <small class="field-help">Esta data é apenas uma sugestão de retorno para a equipe, não um agendamento oficial.</small>
+              </label>
               <label for="visit-streetview">Link do Street View<input id="visit-streetview" name="streetViewUrl" type="url" placeholder="Cole aqui o link do Google Street View" [(ngModel)]="form.streetViewUrl"></label>
               <button type="button" class="secondary" [disabled]="!hasStreetViewTarget()" (click)="openStreetView()">Ver no Street View</button>
             </app-form-section>
@@ -246,7 +255,7 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
             @if (visit.referencePoint) { <div><dt>Ponto de referência</dt><dd>{{ visit.referencePoint }}</dd></div> }
             @if (visit.prayerRequest) { <div class="wide"><dt>Pedido de oração</dt><dd>{{ visit.prayerRequest }}</dd></div> }
             @if (visit.notes) { <div class="wide"><dt>Observações</dt><dd>{{ visit.notes }}</dd></div> }
-            @if (visit.nextVisitAt) { <div><dt>Próxima visita</dt><dd>{{ formatDate(visit.nextVisitAt) }}</dd></div> }
+            @if (visit.nextVisitAt) { <div><dt>Sugestão de próxima visita</dt><dd>{{ formatDate(visit.nextVisitAt) }}</dd></div> }
             @if (visit.streetViewUrl) { <div><dt>Street View</dt><dd><a [href]="visit.streetViewUrl" target="_blank" rel="noopener">Abrir localização</a></dd></div> }
             @if (visit.updatedAt) { <div><dt>Última atualização</dt><dd>{{ formatDate(visit.updatedAt) }}</dd></div> }
           </dl>
@@ -271,7 +280,7 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
     }
   `
 })
-export class VisitsComponent implements AfterViewInit, OnDestroy {
+export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   form: Visit = this.blankVisit();
   filters: { neighborhood: string; wantsVisits: string; from: string; to: string } = {
     neighborhood: '',
@@ -326,6 +335,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   );
   private photoBlobUrls = new WeakMap<Blob, string>();
   private createdPhotoUrls = new Set<string>();
+  private mobileFormDraft: VisitFormDraft | null = null;
 
   constructor(
     public api: ApiService,
@@ -336,6 +346,12 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     private offlineMapCache: OfflineMapCacheService,
     public offlineQueue: OfflineVisitQueueService
   ) {}
+
+  ngOnInit(): void {
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches) {
+      this.restorePersistedVisitDraft();
+    }
+  }
 
   dismissTerritoryNotice(): void {
     this.territoryNoticeDismissed.set(true);
@@ -638,6 +654,7 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     if (!visit.id) {
       return;
     }
+    this.clearVisitDraft();
     this.api.visit(visit.id).subscribe((fullVisit) => {
       const editingAsAdmin = this.isAdmin();
       this.form = { ...fullVisit };
@@ -720,9 +737,15 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     this.technicalDetailsOpen.set(false);
     this.locationAccuracy.set(null);
     this.locationSource.set('none');
+    this.clearVisitDraft();
   }
 
   showMobileView(view: 'form' | 'map'): void {
+    if (view === 'map') {
+      this.preserveVisitDraft();
+    } else {
+      this.restoreVisitDraft();
+    }
     this.mobileView.set(view);
     if (view === 'map') {
       requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -1058,6 +1081,9 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       this.setPoint(latitude, longitude);
       this.message.set('Ponto selecionado no mapa. Latitude e longitude foram preenchidas.');
       this.notifications.info('Ponto selecionado no mapa.');
+      if (this.mobileView() === 'map') {
+        this.preserveVisitDraft();
+      }
     });
   }
 
@@ -1364,6 +1390,86 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
 
   private blankVisit(): Visit {
     return { personName: '', city: 'Sertao', wantsVisits: true };
+  }
+
+  private preserveVisitDraft(): void {
+    const draft: VisitFormDraft = {
+      form: { ...this.form },
+      editingId: this.editingId(),
+      locationSource: this.locationSource(),
+      locationAccuracy: this.locationAccuracy()
+    };
+    this.mobileFormDraft = draft;
+    try {
+      sessionStorage.setItem(this.visitDraftKey(), JSON.stringify(draft));
+    } catch {
+      try {
+        const formWithoutPhoto = { ...draft.form, photoData: undefined };
+        sessionStorage.setItem(this.visitDraftKey(), JSON.stringify({ ...draft, form: formWithoutPhoto }));
+      } catch {
+        // O rascunho em memoria ainda preserva todos os campos durante a troca de painel.
+      }
+    }
+  }
+
+  private restoreVisitDraft(): void {
+    const draft = this.mobileFormDraft || this.readPersistedVisitDraft();
+    if (!draft) {
+      return;
+    }
+    const currentLatitude = this.form.latitude;
+    const currentLongitude = this.form.longitude;
+    const currentAddress = this.form.manualAddress;
+    this.form = { ...draft.form };
+    if (currentLatitude != null && currentLongitude != null) {
+      this.form.latitude = currentLatitude;
+      this.form.longitude = currentLongitude;
+    }
+    if (currentAddress?.trim() && currentAddress !== draft.form.manualAddress) {
+      this.form.manualAddress = currentAddress;
+    }
+    this.editingId.set(draft.editingId);
+    this.mobileFormDraft = {
+      ...draft,
+      form: { ...this.form },
+      locationSource: this.locationSource(),
+      locationAccuracy: this.locationAccuracy()
+    };
+    this.preserveVisitDraft();
+  }
+
+  private restorePersistedVisitDraft(): void {
+    const draft = this.readPersistedVisitDraft();
+    if (!draft) {
+      return;
+    }
+    this.mobileFormDraft = draft;
+    this.form = { ...draft.form };
+    this.editingId.set(draft.editingId);
+    this.locationSource.set(draft.locationSource);
+    this.locationAccuracy.set(draft.locationAccuracy);
+  }
+
+  private readPersistedVisitDraft(): VisitFormDraft | null {
+    try {
+      const value = sessionStorage.getItem(this.visitDraftKey());
+      return value ? JSON.parse(value) as VisitFormDraft : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private clearVisitDraft(): void {
+    this.mobileFormDraft = null;
+    try {
+      sessionStorage.removeItem(this.visitDraftKey());
+    } catch {
+      // O rascunho em memoria ja foi removido.
+    }
+  }
+
+  private visitDraftKey(): string {
+    return `visit-form-draft-v1:${this.auth.user()?.email || 'anonymous'}`;
   }
 
   private resizePhoto(file: File): Promise<string> {
