@@ -19,21 +19,24 @@ const CHILD_ACTIVITIES = ['EBF', 'Culto Infantil', 'Recreação', 'Evangelismo',
   imports: [FormsModule, ListCardComponent, EmptyStateComponent, CompactPaginationComponent, DateRangeFilterComponent],
   template: `
     <section class="page children-page">
-      <div class="page-head children-page-head">
+      <div class="page-head social-page-head children-page-head">
         <div>
           <h1>Departamento Infantil</h1>
           <p class="muted">Cadastre as crianças atendidas nas ações evangelísticas do ministério infantil.</p>
         </div>
-        <div class="page-head-actions">
-          <app-date-range-filter [(from)]="from" [(to)]="to" valueMode="datetime" [loading]="loading()"
-            (filter)="applyFilters()" (clear)="applyFilters()" />
-          <button type="button" class="secondary" (click)="newRecord()">Nova criança</button>
-        </div>
+        <button type="button" class="social-new-button" (click)="newRecord()">
+          <span aria-hidden="true">+</span> Nova criança
+        </button>
       </div>
+
+      @if (!formOpen()) {
+        <app-date-range-filter [(from)]="from" [(to)]="to" valueMode="datetime" [loading]="loading()"
+          (filter)="applyFilters()" (clear)="applyFilters()" />
+      }
 
       @if (message()) {
         <section class="children-save-feedback" role="status" aria-live="polite">
-          <div><strong>{{ message() }}</strong><span>O formulário está pronto para o próximo cadastro.</span></div>
+          <div><strong>{{ message() }}</strong><span>Você voltou para a lista de crianças.</span></div>
           <div class="actions">
             <button type="button" (click)="newAfterSave()">Nova criança</button>
             <button type="button" class="secondary" (click)="backToList()">Voltar para lista</button>
@@ -44,7 +47,7 @@ const CHILD_ACTIVITIES = ['EBF', 'Culto Infantil', 'Recreação', 'Evangelismo',
         <p class="error" role="alert">{{ error() }}</p>
       }
 
-      <div class="split social-layout children-layout">
+      <div class="split social-layout children-layout" [class.form-only]="formOpen()">
         @if (showForm()) {
           <form #childForm="ngForm" class="editor children-editor" novalidate (ngSubmit)="save(childForm)">
             <h2>{{ form.id ? 'Editar cadastro' : 'Novo cadastro' }}</h2>
@@ -112,9 +115,7 @@ const CHILD_ACTIVITIES = ['EBF', 'Culto Infantil', 'Recreação', 'Evangelismo',
                 {{ saving() ? 'Salvando...' : 'Salvar cadastro' }}
               </button>
               <button type="button" class="secondary" [disabled]="saving()" (click)="reset(childForm)">Limpar</button>
-              @if (isCompactScreen()) {
-                <button type="button" class="secondary" (click)="backToList()">Voltar para lista</button>
-              }
+              <button type="button" class="secondary" [disabled]="saving()" (click)="cancel(childForm)">Cancelar</button>
             </div>
           </form>
         }
@@ -259,7 +260,7 @@ export class ChildrenComponent implements OnInit {
   activityName = '';
   currentPage = 0;
   pageSize = 6;
-  mobileFormOpen = signal(false);
+  formOpen = signal(false);
   private appliedParams: Record<string, string | number | undefined> = {};
 
   constructor(private api: ApiService, public auth: AuthService, private notifications: NotificationService) {}
@@ -281,14 +282,13 @@ export class ChildrenComponent implements OnInit {
   newRecord(): void {
     this.reset();
     this.message.set('');
-    this.openFormOnMobile();
+    this.openForm();
   }
 
   newAfterSave(): void {
     this.message.set('');
     this.reset();
-    this.openFormOnMobile();
-    window.setTimeout(() => document.querySelector<HTMLInputElement>('#child-name')?.focus(), 0);
+    this.openForm();
   }
 
   save(form: NgForm): void {
@@ -309,6 +309,7 @@ export class ChildrenComponent implements OnInit {
       next: () => {
         this.ok(editing ? 'Cadastro infantil atualizado com sucesso.' : 'Cadastro infantil salvo com sucesso.');
         this.reset(form);
+        this.backToList();
         this.fetchData();
       },
       error: error => this.fail(this.errorMessage(error))
@@ -319,7 +320,7 @@ export class ChildrenComponent implements OnInit {
     this.message.set('');
     this.form = { ...record, guardianPhone: this.formatPhone(record.guardianPhone) };
     this.ageInput = record.age === undefined ? '' : String(record.age);
-    this.openFormOnMobile();
+    this.openForm();
   }
 
   delete(record: ChildRecord): void {
@@ -341,6 +342,13 @@ export class ChildrenComponent implements OnInit {
     form?.resetForm(this.form);
   }
 
+  cancel(form: NgForm): void {
+    this.reset(form);
+    this.message.set('');
+    this.error.set('');
+    this.backToList();
+  }
+
   goToPage(page: number): void {
     this.currentPage = Math.max(0, page);
     this.fetchData();
@@ -348,19 +356,19 @@ export class ChildrenComponent implements OnInit {
   }
 
   showForm(): boolean {
-    return !this.isCompactScreen() || this.mobileFormOpen();
+    return this.formOpen();
   }
 
   showReport(): boolean {
-    return !this.isCompactScreen() || !this.mobileFormOpen();
+    return !this.formOpen();
   }
 
   showTable(): boolean {
-    return !this.isCompactScreen() || !this.mobileFormOpen();
+    return !this.formOpen();
   }
 
   backToList(): void {
-    this.mobileFormOpen.set(false);
+    this.formOpen.set(false);
     this.scrollToTable();
   }
 
@@ -467,10 +475,6 @@ export class ChildrenComponent implements OnInit {
     return value ? value.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : '0';
   }
 
-  isCompactScreen(): boolean {
-    return typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches;
-  }
-
   private fetchData(): void {
     this.loading.set(true);
     this.error.set('');
@@ -556,16 +560,15 @@ export class ChildrenComponent implements OnInit {
     this.notifications.error(message);
   }
 
-  private openFormOnMobile(): void {
-    if (this.isCompactScreen()) {
-      this.mobileFormOpen.set(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+  private openForm(): void {
+    this.formOpen.set(true);
+    window.setTimeout(() => {
+      document.querySelector('.children-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelector<HTMLInputElement>('#child-name')?.focus();
+    }, 0);
   }
 
   private scrollToTable(): void {
-    if (this.isCompactScreen()) {
-      window.setTimeout(() => document.querySelector('.children-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
-    }
+    window.setTimeout(() => document.querySelector('.children-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
   }
 }

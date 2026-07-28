@@ -1220,6 +1220,7 @@ body:has(app-social-assistance) { scroll-padding-bottom: calc(110px + env(safe-a
 .social-report .detail-head p { margin-bottom: 0; }
 .social-table .list-head { margin-bottom: 4px; }
 .children-layout { grid-template-columns: minmax(340px, 400px) minmax(0, 1fr); }
+.children-layout.form-only { grid-template-columns: minmax(340px, 640px); }
 .children-editor { position: sticky; top: 18px; min-width: 0; gap: 14px; }
 .children-save-feedback {
   display: flex;
