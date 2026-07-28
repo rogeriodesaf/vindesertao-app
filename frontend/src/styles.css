@@ -1130,6 +1130,86 @@ app-date-range-filter { min-width: 0; display: block; }
 .split { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 18px; }
 .social-layout { grid-template-columns: 380px minmax(0, 1fr); align-items: start; }
 .social-analytics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+body:has(app-social-assistance) .app-footer { display: none; }
+body:has(app-social-assistance) { scroll-padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+.social-page-head { align-items: flex-start; }
+.social-new-button {
+  min-height: 48px;
+  gap: 9px;
+  padding: 10px 20px;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  font-weight: 800;
+}
+.social-new-button span { font-size: 22px; line-height: 1; }
+.social-filter-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--color-surface-elevated);
+  box-shadow: 0 5px 18px color-mix(in srgb, var(--color-background) 16%, transparent);
+}
+.social-filter-toggle {
+  width: 100%;
+  min-height: 58px;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  box-shadow: none;
+}
+.social-filter-toggle:hover { background: var(--color-hover); }
+.social-filter-toggle > span:first-child { min-width: 0; display: grid; gap: 2px; }
+.social-filter-toggle small { color: var(--muted); font-weight: 500; overflow-wrap: anywhere; }
+.social-filter-chevron { flex: 0 0 auto; font-size: 24px; transform: rotate(180deg); transition: transform 160ms ease; }
+.social-filter-card.collapsed .social-filter-chevron { transform: rotate(0); }
+.social-filter-content {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  align-items: end;
+  gap: 14px;
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--line);
+  animation: children-feedback-in 180ms ease-out;
+}
+.social-filter-content > label { padding-top: 14px; }
+.social-filter-content app-date-range-filter { width: 100%; }
+.social-filter-content .date-range-filter {
+  min-width: 0;
+  padding: 14px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.social-assistance-layout { grid-template-columns: minmax(340px, 420px) minmax(0, 1fr); }
+.social-editor { min-width: 0; gap: 16px; }
+.social-form-section {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface-elevated) 72%, transparent);
+}
+.social-form-section legend {
+  padding: 0 7px;
+  color: var(--color-primary-readable);
+  font-size: 13px;
+  font-weight: 800;
+}
+.social-form-section textarea { min-height: 88px; }
+.social-form-actions > button:first-child { min-height: 44px; font-weight: 800; }
+.social-total-metric { grid-template-columns: minmax(180px, 320px); }
+.social-report .detail-head p { margin-bottom: 0; }
+.social-table .list-head { margin-bottom: 4px; }
 .children-layout { grid-template-columns: minmax(340px, 400px) minmax(0, 1fr); }
 .children-editor { position: sticky; top: 18px; min-width: 0; gap: 14px; }
 .children-save-feedback {
@@ -1696,6 +1776,15 @@ tbody tr:hover { background: var(--color-hover); }
   .map-toolbar button, .map-toolbar .button { width: 100%; }
   .metric-grid, .analytics-grid, .profile-summary, .team-report-grid, .split, .social-layout, .social-analytics, .support-layout, .teams-layout, .territory-layout, .duplicate-grid { grid-template-columns: 1fr; }
   .children-layout { grid-template-columns: 1fr; }
+  .social-assistance-layout { grid-template-columns: 1fr; }
+  .social-filter-content { grid-template-columns: 1fr; align-items: stretch; }
+  .social-filter-content > label { padding-top: 12px; }
+  app-social-assistance .social-page { padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)); }
+  .social-page-head .social-new-button { width: 100%; }
+  .social-editor { scroll-margin-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+  .social-form-section input,
+  .social-form-section select,
+  .social-form-section textarea { scroll-margin-bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
   .children-editor { position: static; }
   .children-save-feedback { align-items: stretch; flex-direction: column; }
   .children-save-feedback .actions { width: 100%; flex-wrap: wrap; }
@@ -1825,6 +1914,8 @@ tbody tr:hover { background: var(--color-hover); }
   app-visits .form-section-badge { max-width: 96px; }
   .children-metric-grid { grid-template-columns: 1fr; }
   .children-form-actions { display: grid; grid-template-columns: 1fr; }
+  .social-form-actions { display: grid; grid-template-columns: 1fr; }
+  .social-form-actions button { width: 100%; }
   .children-form-actions button { width: 100%; }
   .list-card-quick-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .list-card-quick-actions button { width: 100%; min-width: 0; }
