@@ -386,7 +386,6 @@ export class ChildrenComponent implements OnInit {
       this.notifications.warning('Libere pop-ups para gerar o PDF.');
       return;
     }
-    printWindow.opener = null;
     printWindow.document.write('<p style="font-family:sans-serif;padding:24px">Preparando relatório...</p>');
     this.exportingPdf.set(true);
     this.api.children({ ...this.appliedParams, page: 0, size: 10000 }).subscribe({

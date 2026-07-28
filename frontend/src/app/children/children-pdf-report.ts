@@ -8,6 +8,8 @@ export function renderChildrenPdf(
   period: string,
   appOrigin: string
 ): void {
+  const appUrl = `${appOrigin}/children`;
+  const appUrlScript = JSON.stringify(appUrl).replace(/</g, '\\u003c');
   const metric = (label: string, value: string | number) =>
     `<div class="metric"><span>${label}</span><strong>${value}</strong></div>`;
   const rows = records.map(record => `
@@ -27,6 +29,10 @@ export function renderChildrenPdf(
     <style>
       @page { size: A4 landscape; margin: 12mm; }
       * { box-sizing: border-box; } body { margin: 0; color: #17252b; font: 12px Arial, sans-serif; }
+      .print-toolbar { position: sticky; top: 0; z-index: 10; display: flex; justify-content: flex-end; gap: 8px;
+        padding: 10px 12px; border-bottom: 1px solid #d7e0e4; background: #fff; }
+      .print-toolbar button { min-height: 42px; padding: 8px 16px; border: 0; border-radius: 10px;
+        background: #1e4d5c; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
       header { display: flex; align-items: center; gap: 14px; padding-bottom: 12px; border-bottom: 3px solid #1e4d5c; }
       header img { width: 54px; height: 54px; object-fit: contain; } h1 { margin: 0 0 4px; color: #1e4d5c; font-size: 22px; }
       header p, footer { margin: 0; color: #5c6b73; } .metrics { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 14px 0; }
@@ -35,7 +41,11 @@ export function renderChildrenPdf(
       table { width: 100%; border-collapse: collapse; } th { background: #1e4d5c; color: white; }
       th, td { padding: 7px; border: 1px solid #d7e0e4; text-align: left; vertical-align: top; }
       tbody tr:nth-child(even) { background: #f5f7f8; } footer { margin-top: 12px; text-align: right; }
+      @media print { .print-toolbar { display: none !important; } }
     </style></head><body>
+    <nav class="print-toolbar" aria-label="Ações do relatório">
+      <button type="button" onclick="returnToApp()">Voltar ao aplicativo</button>
+    </nav>
     <header><img src="${appOrigin}/assets/logo-vinde-sertao.webp" alt=""><div><h1>Vinde Sertão · Departamento Infantil</h1>
     <p>Período: ${escapeHtml(period)} · Emitido em ${escapeHtml(new Date().toLocaleString('pt-BR'))}</p></div></header>
     <section class="metrics">
@@ -49,7 +59,19 @@ export function renderChildrenPdf(
     <table><thead><tr><th>Nome</th><th>Idade</th><th>Responsável</th><th>Telefone</th><th>Atividade</th><th>Bairro/comunidade</th><th>Cadastro</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="7">Nenhum cadastro no período.</td></tr>'}</tbody></table>
     <footer>Vinde Sertão · Relatório emitido pelo sistema</footer>
-    <script>addEventListener('load', () => setTimeout(() => { focus(); print(); }, 300));<\/script>
+    <script>
+      const appUrl = ${appUrlScript};
+      function returnToApp() {
+        if (window.opener && !window.opener.closed) {
+          window.opener.focus();
+          window.close();
+          return;
+        }
+        window.location.href = appUrl;
+      }
+      addEventListener('afterprint', () => setTimeout(returnToApp, 100));
+      addEventListener('load', () => setTimeout(() => { focus(); print(); }, 300));
+    <\/script>
     </body></html>`);
   printWindow.document.close();
 }
