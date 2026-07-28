@@ -1295,6 +1295,9 @@ body:has(app-social-assistance) { scroll-padding-bottom: calc(110px + env(safe-a
 .children-photo-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .children-photo-head button { width: 44px; min-width: 44px; padding: 0; font-size: 25px; }
 .children-photo-modal img { width: 100%; max-height: calc(100dvh - 130px); display: block; object-fit: contain; border-radius: 12px; background: #111; }
+.users-search { grid-template-columns: minmax(240px, 1fr) auto auto; align-items: end; gap: 10px; margin-bottom: 14px; }
+.users-search label { min-width: 0; }
+.users-search button { min-height: 42px; }
 @keyframes children-feedback-in { from { opacity: 0; transform: translateY(-6px); } }
 @keyframes skeleton-shimmer { to { transform: translateX(100%); } }
 .editor, .table-wrap {
@@ -1930,6 +1933,8 @@ tbody tr:hover { background: var(--color-hover); }
   .social-form-actions { display: grid; grid-template-columns: 1fr; }
   .social-form-actions button { width: 100%; }
   .children-form-actions button { width: 100%; }
+  .users-search { grid-template-columns: 1fr; }
+  .users-search button { width: 100%; }
   .list-card-quick-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .list-card-quick-actions button { width: 100%; min-width: 0; }
   .list-card-quick-actions button:last-child:nth-child(odd) { grid-column: 1 / -1; }

@@ -9,6 +9,7 @@ import jakarta.ws.rs.core.MediaType;
 import org.vindesertao.common.PageResponse;
 
 import java.util.List;
+import java.util.Locale;
 
 @Path("/users")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -24,10 +25,17 @@ public class UserResource {
     @GET
     public PageResponse<UserDtos.UserResponse> list(@QueryParam("page") @DefaultValue("0") int page,
                                                      @QueryParam("size") @DefaultValue("20") int size,
-                                                     @QueryParam("includeInactive") @DefaultValue("false") boolean includeInactive) {
-        var query = includeInactive
-                ? users.find("order by name asc")
-                : users.find("active = true order by name asc");
+                                                     @QueryParam("includeInactive") @DefaultValue("false") boolean includeInactive,
+                                                     @QueryParam("q") String search) {
+        String normalizedSearch = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
+        String searchPattern = "%" + normalizedSearch + "%";
+        var query = normalizedSearch.isBlank()
+                ? includeInactive
+                    ? users.find("order by name asc")
+                    : users.find("active = true order by name asc")
+                : includeInactive
+                    ? users.find("(lower(name) like ?1 or lower(email) like ?1) order by name asc", searchPattern)
+                    : users.find("active = true and (lower(name) like ?1 or lower(email) like ?1) order by name asc", searchPattern);
         long total = query.count();
         List<UserDtos.UserResponse> items = query.page(Page.of(page, size)).list()
                 .stream()

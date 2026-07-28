@@ -138,6 +138,16 @@ const roles: Role[] = ['admin', 'lider', 'projetista'];
               </label>
             </div>
           </div>
+          <form class="users-search" (ngSubmit)="searchUsers()">
+            <label for="users-search-input">Buscar usuário
+              <input id="users-search-input" name="userSearch" type="search" autocomplete="off"
+                placeholder="Nome ou e-mail" [(ngModel)]="userSearch">
+            </label>
+            <button type="submit">Buscar</button>
+            @if (userSearch || appliedSearch) {
+              <button type="button" class="secondary" (click)="clearSearch()">Limpar</button>
+            }
+          </form>
           <div class="unified-list">
             @for (user of users(); track user.id) {
               <app-list-card [title]="user.name" [state]="user.active ? 'Ativo' : 'Inativo'" [interactive]="true"
@@ -164,6 +174,8 @@ export class UsersComponent implements OnInit {
   summary = signal<UserSummary | null>(null);
   mobileFormOpen = signal(false);
   showInactive = false;
+  userSearch = '';
+  appliedSearch = '';
   pageSize = 5;
   availableRoles = roles;
   form: AppUser = this.blank();
@@ -177,7 +189,12 @@ export class UsersComponent implements OnInit {
   }
 
   load(): void {
-    this.api.users({ page: this.pageIndex(), size: this.pageSize, includeInactive: this.showInactive }).subscribe((page) => {
+    this.api.users({
+      page: this.pageIndex(),
+      size: this.pageSize,
+      includeInactive: this.showInactive,
+      q: this.appliedSearch || undefined
+    }).subscribe((page) => {
       this.users.set(page.items);
       this.total.set(page.total);
       this.totalPages.set(Math.max(1, page.pages));
@@ -287,6 +304,19 @@ export class UsersComponent implements OnInit {
     this.pageIndex.set(0);
     this.load();
     this.scrollToUsersTable();
+  }
+
+  searchUsers(): void {
+    this.appliedSearch = this.userSearch.trim();
+    this.pageIndex.set(0);
+    this.load();
+  }
+
+  clearSearch(): void {
+    this.userSearch = '';
+    this.appliedSearch = '';
+    this.pageIndex.set(0);
+    this.load();
   }
 
   showSummary(): boolean {
