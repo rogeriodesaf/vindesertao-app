@@ -5,6 +5,7 @@ import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
 import java.util.List;
 
@@ -41,5 +42,13 @@ public class TeamResource {
     @RolesAllowed("admin")
     public TeamDtos.TeamResponse update(@PathParam("id") Long id, @Valid TeamDtos.TeamRequest request) {
         return TeamDtos.TeamResponse.from(teamService.update(id, request));
+    }
+
+    @DELETE
+    @Path("/{id}")
+    @RolesAllowed("admin")
+    public Response delete(@PathParam("id") Long id) {
+        teamService.delete(id);
+        return Response.noContent().build();
     }
 }

@@ -82,6 +82,10 @@ export class ApiService {
     return this.http.put<Team>(`${environment.apiBaseUrl}/teams/${team.id}`, team);
   }
 
+  deleteTeam(id: number) {
+    return this.http.delete<void>(`${environment.apiBaseUrl}/teams/${id}`);
+  }
+
   territories() {
     return this.http.get<Territory[]>(`${environment.apiBaseUrl}/territories`);
   }

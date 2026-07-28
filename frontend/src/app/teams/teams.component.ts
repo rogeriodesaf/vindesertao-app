@@ -2,12 +2,13 @@ import { SlicePipe } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule, NgForm } from '@angular/forms';
+import { finalize } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { AppUser, Team, TeamMember, TeamType, Visit } from '../core/models';
 import { NotificationService } from '../core/notification.service';
 import { EmptyStateComponent } from '../shared/empty-state.component';
-import { ListCardComponent } from '../shared/list-card.component';
+import { ListCardAction, ListCardComponent } from '../shared/list-card.component';
 
 const teamTypes: Array<{ value: TeamType; label: string }> = [
   { value: 'EVANGELISM', label: 'Evangelismo' },
@@ -77,7 +78,7 @@ const teamTypes: Array<{ value: TeamType; label: string }> = [
           <div class="table-wrap unified-list">
             @for (team of teams(); track team.id) {
               <app-list-card [title]="team.name" [interactive]="true" [selected]="selectedTeam()?.id === team.id"
-                [actions]="[{ id: 'view', label: 'Visualizar', icon: 'open' }, { id: 'edit', label: 'Editar', icon: 'edit' }]"
+                [actions]="teamActions(team)" [actionsInline]="true"
                 [infos]="[{ icon: 'service', text: teamTypeLabel(team.teamType) }, { icon: 'person', text: team.leaderName || '-' }, { icon: 'groups', text: membersOf(team).length + ' integrante(s)' }]"
                 (activate)="selectTeam(team)" (action)="handleTeamAction($event, team)" />
             } @empty { <app-empty-state message="Nenhuma equipe encontrada." /> }
@@ -151,6 +152,7 @@ export class TeamsComponent implements OnInit {
   selectedTeam = signal<Team | null>(null);
   mobileFocusedTeam = signal(false);
   teamVisits = signal<Visit[]>([]);
+  deletingId = signal<number | null>(null);
   message = signal('');
   error = signal('');
   form: Team = this.blank();
@@ -213,8 +215,23 @@ export class TeamsComponent implements OnInit {
   }
 
   handleTeamAction(action: string, team: Team): void {
-    if (action === 'edit') this.edit(team);
-    else this.selectTeam(team);
+    if (action === 'edit') {
+      this.edit(team);
+    } else if (action === 'delete') {
+      this.delete(team);
+    }
+  }
+
+  teamActions(team: Team): ListCardAction[] {
+    return [
+      { id: 'edit', label: 'Editar', icon: 'edit' },
+      {
+        id: 'delete',
+        label: this.deletingId() === team.id ? 'Excluindo...' : 'Excluir',
+        icon: 'delete',
+        danger: true
+      }
+    ];
   }
 
   isAdmin(): boolean {
@@ -262,6 +279,40 @@ export class TeamsComponent implements OnInit {
     });
   }
 
+  delete(team: Team): void {
+    if (!team.id || this.deletingId() !== null) {
+      return;
+    }
+    const confirmed = window.confirm(
+      `Excluir a equipe "${team.name}"? A exclusao so sera concluida se nao houver usuarios, visitas, territorios, atendimentos ou historico vinculados.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    this.message.set('');
+    this.error.set('');
+    this.deletingId.set(team.id);
+    this.api.deleteTeam(team.id)
+      .pipe(finalize(() => this.deletingId.set(null)))
+      .subscribe({
+        next: () => {
+          this.teams.update((teams) => teams.filter((item) => item.id !== team.id));
+          if (this.selectedTeam()?.id === team.id) {
+            this.selectedTeam.set(null);
+            this.teamVisits.set([]);
+            this.mobileFocusedTeam.set(false);
+          }
+          if (this.form.id === team.id) {
+            this.form = this.blank();
+          }
+          this.ok('Equipe excluida com sucesso.');
+          this.loadUsers();
+        },
+        error: (response: HttpErrorResponse) => this.fail(this.errorMessage(response, 'Nao foi possivel excluir a equipe.'))
+      });
+  }
+
   private blank(): Team {
     return { name: '', teamType: 'EVANGELISM', canRegisterVisits: true };
   }
@@ -307,7 +358,7 @@ export class TeamsComponent implements OnInit {
     return 'leader' in member ? member.leader : this.selectedTeam()?.leaderId === member.id;
   }
 
-  private errorMessage(response: HttpErrorResponse): string {
+  private errorMessage(response: HttpErrorResponse, fallback = 'Nao foi possivel salvar a equipe. Revise os campos e tente novamente.'): string {
     if (response.status === 401) {
       return 'Sua sessao expirou. Faca login novamente.';
     }
@@ -321,7 +372,7 @@ export class TeamsComponent implements OnInit {
     if (body?.violations?.length) {
       return body.violations.map((violation: { message: string }) => violation.message).join(' ');
     }
-    return 'Nao foi possivel salvar a equipe. Revise os campos e tente novamente.';
+    return fallback;
   }
 
   private ok(message: string): void {

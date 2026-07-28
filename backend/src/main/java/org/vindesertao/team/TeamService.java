@@ -2,8 +2,10 @@ package org.vindesertao.team;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.WebApplicationException;
 import org.vindesertao.audit.AuditService;
 import org.vindesertao.auth.CurrentUser;
 import org.vindesertao.user.AppUser;
@@ -31,6 +33,9 @@ public class TeamService {
 
     @Inject
     AuditService auditService;
+
+    @Inject
+    EntityManager entityManager;
 
     public List<Team> list() {
         return teams.find("order by name").list();
@@ -60,6 +65,22 @@ public class TeamService {
         syncLeaderMainTeam(team);
         auditService.log("UPDATE", "TEAM", team.id, before, snapshot(team));
         return team;
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        Team team = teams.findByIdOptional(id)
+                .orElseThrow(() -> new NotFoundException("Equipe nao encontrada."));
+        if (hasLinkedRecords(id)) {
+            throw new WebApplicationException(
+                    "Esta equipe possui usuarios, visitas, territorios, atendimentos ou historico vinculados. "
+                            + "Transfira ou remova esses vinculos antes de exclui-la.",
+                    409
+            );
+        }
+        String before = snapshot(team);
+        teams.delete(team);
+        auditService.log("DELETE", "TEAM", id, before, null);
     }
 
     private void apply(TeamDtos.TeamRequest request, Team team) {
@@ -126,6 +147,34 @@ public class TeamService {
         return members.values().stream()
                 .map(user -> TeamDtos.TeamMemberResponse.from(user, team))
                 .toList();
+    }
+
+    private boolean hasLinkedRecords(Long teamId) {
+        return count("AppUser", "team.id", teamId) > 0
+                || count("UserTeamMembership", "team.id", teamId) > 0
+                || count("HouseholdVisit", "team.id", teamId) > 0
+                || count("Territory", "team.id", teamId) > 0
+                || count("SocialAssistanceRecord", "team.id", teamId) > 0
+                || historyCount(teamId) > 0;
+    }
+
+    private long count(String entity, String teamField, Long teamId) {
+        return entityManager.createQuery(
+                        "select count(record) from " + entity + " record where record." + teamField + " = :teamId",
+                        Long.class
+                )
+                .setParameter("teamId", teamId)
+                .getSingleResult();
+    }
+
+    private long historyCount(Long teamId) {
+        return entityManager.createQuery(
+                        "select count(history) from UserTeamHistory history "
+                                + "where history.oldTeam.id = :teamId or history.newTeam.id = :teamId",
+                        Long.class
+                )
+                .setParameter("teamId", teamId)
+                .getSingleResult();
     }
 
     private String snapshot(Team team) {
