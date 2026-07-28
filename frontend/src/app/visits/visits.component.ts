@@ -19,6 +19,7 @@ import { EmptyStateComponent } from '../shared/empty-state.component';
 import { ListCardComponent, ListCardInfo } from '../shared/list-card.component';
 import { FormSectionComponent } from '../shared/form-section.component';
 import { DatePickerComponent } from '../shared/date-picker.component';
+import { DateRangeFilterComponent } from '../shared/date-range-filter.component';
 
 type VisitFormSection = 'basic' | 'location' | 'photo' | 'more' | 'visits';
 type LocationSource = 'none' | 'gps' | 'map' | 'manual' | 'address';
@@ -27,7 +28,7 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
 @Component({
   selector: 'app-visits',
   standalone: true,
-  imports: [FormsModule, SlicePipe, ListCardComponent, EmptyStateComponent, FormSectionComponent, DatePickerComponent],
+  imports: [FormsModule, SlicePipe, ListCardComponent, EmptyStateComponent, FormSectionComponent, DatePickerComponent, DateRangeFilterComponent],
   host: {
     '(document:keydown.escape)': 'closePhoto(); closeVisitDetails()'
   },
@@ -112,11 +113,16 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
             </app-form-section>
 
             <app-form-section title="Localização" subtitle="Onde esta visita ocorreu" icon="location" tone="green" sectionId="visit-location"
-              [badge]="hasSelectedPoint() ? 'Localização encontrada' : ''" [open]="openSection() === 'location'" [error]="sectionError() === 'location'" (toggle)="toggleSection('location')">
+              [badge]="hasSelectedPoint() ? 'Localização capturada' : ''" [open]="openSection() === 'location'" [error]="sectionError() === 'location'" (toggle)="toggleSection('location')">
               <div class="location-summary" role="status" aria-live="polite" [attr.data-state]="locationStateLabel()"><span class="location-summary-icon" aria-hidden="true">{{ locationStateIcon() }}</span><div><strong>{{ locationHeadline() }}</strong><span>{{ geolocationMessage() || locationAddress() }}</span>@if (locationAccuracy()) { <small>Precisão: ± {{ locationAccuracy() }} metros</small> }</div></div>
               @if (sectionError() === 'location' && error()) { <small class="field-error">{{ error() }}</small> }
               @if (territoryStatus()) { <div class="territory-form-alert" [class.warning]="territoryOutside()" role="status"><span aria-hidden="true">{{ territoryOutside() ? '!' : '✓' }}</span><div><strong>{{ territoryOutside() ? 'Atenção' : 'Território confirmado' }}</strong><small>{{ territoryStatus() }}</small></div></div> }
-              <div class="location-primary-actions"><button type="button" class="secondary" [disabled]="!hasSelectedPoint()" (click)="showMobileView('map')">Ver no mapa</button><button type="button" (click)="locationActionsOpen.set(true)">Alterar localização</button></div>
+              <div class="location-primary-actions" [class.has-location]="hasSelectedPoint()">
+                @if (hasSelectedPoint()) {
+                  <button type="button" class="secondary" (click)="showMobileView('map')">Ver no mapa</button>
+                }
+                <button type="button" [disabled]="geolocationState() === 'loading'" (click)="handleLocationAction()">{{ locationActionLabel() }}</button>
+              </div>
               <details class="technical-details" [open]="technicalDetailsOpen()" (toggle)="technicalDetailsOpen.set($any($event.target).open)">
                 <summary>Detalhes técnicos</summary>
                 <div class="form-grid coordinates"><label for="visit-latitude">Latitude<input id="visit-latitude" name="latitude" type="number" step="any" [(ngModel)]="form.latitude" (ngModelChange)="manualCoordinatesChanged()"></label><label for="visit-longitude">Longitude<input id="visit-longitude" name="longitude" type="number" step="any" [(ngModel)]="form.longitude" (ngModelChange)="manualCoordinatesChanged()"></label></div>
@@ -145,7 +151,16 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
 
             <app-form-section title="Visitas da equipe" subtitle="Histórico de visitas" icon="groups" tone="blue" sectionId="visit-team-history"
               [badge]="visits().length + ' visita(s)'" [open]="openSection() === 'visits'" (toggle)="toggleSection('visits')">
-              <div class="filters visit-section-filters"><div class="form-grid"><input aria-label="Filtrar por bairro" placeholder="Bairro" [(ngModel)]="filters.neighborhood" [ngModelOptions]="{standalone: true}" (keyup.enter)="loadVisits()"><select aria-label="Filtrar por interesse" [(ngModel)]="filters.wantsVisits" [ngModelOptions]="{standalone: true}" (change)="loadVisits()"><option value="">Todas</option><option value="true">Aceita</option><option value="false">Não aceita</option></select></div><button type="button" class="secondary full" [disabled]="loadingVisits()" (click)="loadVisits()">{{ loadingVisits() ? 'Carregando...' : 'Filtrar' }}</button></div>
+              <div class="filters visit-section-filters">
+                <div class="form-grid">
+                  <input aria-label="Filtrar por bairro" placeholder="Bairro" [(ngModel)]="filters.neighborhood" [ngModelOptions]="{standalone: true}" (keyup.enter)="loadVisits()">
+                  <select aria-label="Filtrar por interesse" [(ngModel)]="filters.wantsVisits" [ngModelOptions]="{standalone: true}">
+                    <option value="">Todas</option><option value="true">Aceita</option><option value="false">Não aceita</option>
+                  </select>
+                </div>
+                <app-date-range-filter class="visit-date-filter" [(from)]="filters.from" [(to)]="filters.to"
+                  valueMode="datetime" [loading]="loadingVisits()" (filter)="loadVisits()" (clear)="loadVisits()" />
+              </div>
               <div class="visit-list unified-list">@for (visit of visits(); track visit.id) { <app-list-card [title]="visit.personName" [interactive]="true" (activate)="selectVisit(visit)" [infos]="visitCardInfos(visit)" /> } @empty { <app-empty-state message="Nenhuma visita encontrada." /> }</div>
             </app-form-section>
             @if (message()) {
@@ -162,8 +177,8 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
           @if (locationActionsOpen()) {
             <button type="button" class="location-sheet-backdrop" aria-label="Fechar opções de localização" (click)="locationActionsOpen.set(false)"></button>
             <section class="location-action-sheet" role="dialog" aria-modal="true" aria-labelledby="location-sheet-title">
-              <h2 id="location-sheet-title">Alterar localização</h2>
-              <button type="button" [disabled]="geolocationState() === 'loading'" (click)="useMyLocation(); locationActionsOpen.set(false)"><strong>Usar minha localização</strong><small>Obter a localização atual pelo GPS</small></button>
+              <h2 id="location-sheet-title">Atualizar localização</h2>
+              <button type="button" [disabled]="geolocationState() === 'loading'" (click)="useMyLocation(); locationActionsOpen.set(false)"><strong>Atualizar pelo GPS</strong><small>Capturar novamente a localização atual</small></button>
               <button type="button" (click)="showMobileView('map'); locationActionsOpen.set(false)"><strong>Abrir mapa para ajustar</strong><small>Mover o ponto no mapa</small></button>
               <div class="location-address-action"><input aria-label="Inserir endereço" placeholder="Rua, bairro ou cidade" [(ngModel)]="searchText" (keyup.enter)="searchAddress(); locationActionsOpen.set(false)"><button type="button" (click)="searchAddress(); locationActionsOpen.set(false)">Buscar endereço</button></div>
               <button type="button" class="secondary" (click)="locationActionsOpen.set(false)">Cancelar</button>
@@ -180,8 +195,14 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
         @if (!canManageVisits()) {
           <div class="filters">
             <h2>{{ visitListTitle() }}</h2>
-            <div class="form-grid"><input placeholder="Bairro" [(ngModel)]="filters.neighborhood" (keyup.enter)="loadVisits()"><select [(ngModel)]="filters.wantsVisits" (change)="loadVisits()"><option value="">Todas</option><option value="true">Aceita</option><option value="false">Não aceita</option></select></div>
-            <button type="button" class="secondary full" [disabled]="loadingVisits()" (click)="loadVisits()">{{ loadingVisits() ? 'Carregando...' : 'Filtrar' }}</button>
+            <div class="form-grid">
+              <input placeholder="Bairro" [(ngModel)]="filters.neighborhood" (keyup.enter)="loadVisits()">
+              <select [(ngModel)]="filters.wantsVisits">
+                <option value="">Todas</option><option value="true">Aceita</option><option value="false">Não aceita</option>
+              </select>
+            </div>
+            <app-date-range-filter class="visit-date-filter" [(from)]="filters.from" [(to)]="filters.to"
+              valueMode="datetime" [loading]="loadingVisits()" (filter)="loadVisits()" (clear)="loadVisits()" />
           </div>
           <div class="visit-list unified-list">@for (visit of visits(); track visit.id) { <app-list-card [title]="visit.personName" [interactive]="true" (activate)="selectVisit(visit)" [infos]="visitCardInfos(visit)" /> } @empty { <app-empty-state message="Nenhuma visita encontrada." /> }</div>
         }
@@ -248,7 +269,12 @@ type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
 })
 export class VisitsComponent implements AfterViewInit, OnDestroy {
   form: Visit = this.blankVisit();
-  filters: { neighborhood: string; wantsVisits: string } = { neighborhood: '', wantsVisits: '' };
+  filters: { neighborhood: string; wantsVisits: string; from: string; to: string } = {
+    neighborhood: '',
+    wantsVisits: '',
+    from: '',
+    to: ''
+  };
   visits = signal<Visit[]>([]);
   territories = signal<Territory[]>([]);
   editingId = signal<number | null>(null);
@@ -416,15 +442,24 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.loadingVisits.set(true);
-    this.api.visits({ page: 0, size: 100, neighborhood: this.filters.neighborhood, wantsVisits: this.filters.wantsVisits || undefined })
+    this.api.visits({
+      page: 0,
+      size: 100,
+      neighborhood: this.filters.neighborhood,
+      wantsVisits: this.filters.wantsVisits || undefined,
+      from: this.toOffset(this.filters.from),
+      to: this.toOffset(this.filters.to)
+    })
       .pipe(finalize(() => this.loadingVisits.set(false)))
       .subscribe({
         next: (page) => {
           this.visits.set(page.items);
           this.renderMarkers(page.items);
           this.refreshMapView();
-          this.offlineMapCache.saveVisits(page.items)
-            .catch((error) => console.warn('[Mapa offline] Não foi possível salvar as visitas:', error));
+          if (!this.hasVisitFilters()) {
+            this.offlineMapCache.saveVisits(page.items)
+              .catch((error) => console.warn('[Mapa offline] Não foi possível salvar as visitas:', error));
+          }
         },
         error: () => this.loadCachedVisits(true)
       });
@@ -455,8 +490,9 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   private loadCachedVisits(requestFailed = false): void {
     this.offlineMapCache.loadVisits().then((items) => {
       if (items.length) {
-        this.visits.set(items);
-        this.renderMarkers(items);
+        const filtered = this.filterCachedVisits(items);
+        this.visits.set(filtered);
+        this.renderMarkers(filtered);
         this.refreshMapView();
         this.showOfflineMapNotice();
         return;
@@ -465,6 +501,25 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         this.fail('Não foi possível carregar as visitas e ainda não há uma cópia offline neste aparelho.');
       }
     });
+  }
+
+  private filterCachedVisits(items: Visit[]): Visit[] {
+    const neighborhood = this.filters.neighborhood.trim().toLocaleLowerCase('pt-BR');
+    const wantsVisits = this.filters.wantsVisits;
+    const from = this.filters.from ? new Date(this.filters.from).getTime() : null;
+    const to = this.filters.to ? new Date(this.filters.to).getTime() : null;
+    return items.filter(visit => {
+      if (neighborhood && !String(visit.neighborhood || '').toLocaleLowerCase('pt-BR').includes(neighborhood)) return false;
+      if (wantsVisits && String(visit.wantsVisits) !== wantsVisits) return false;
+      const createdAt = visit.createdAt ? new Date(visit.createdAt).getTime() : null;
+      if (from !== null && (createdAt === null || createdAt < from)) return false;
+      if (to !== null && (createdAt === null || createdAt > to)) return false;
+      return true;
+    });
+  }
+
+  private hasVisitFilters(): boolean {
+    return !!(this.filters.neighborhood.trim() || this.filters.wantsVisits || this.filters.from || this.filters.to);
   }
 
   private loadCachedTerritories(requestFailed = false): void {
@@ -649,19 +704,19 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
         this.locationSource.set('gps');
         this.map?.setView([latitude, longitude], 18);
         this.geolocationState.set('success');
-        this.geolocationMessage.set('Localização encontrada. Você ainda pode ajustar o ponto no mapa.');
-        this.ok('Localização encontrada e adicionada à ficha.');
+        this.geolocationMessage.set('Localização capturada. Use "Ver no mapa" para conferir ou ajustar o ponto.');
+        this.ok('Localização capturada e adicionada à ficha.');
       }),
       (geoError) => this.zone.run(() => {
         if (geoError.code === geoError.PERMISSION_DENIED) {
           this.geolocationState.set('denied');
-          this.geolocationMessage.set('Permissão de localização negada. Marque o ponto manualmente no mapa.');
+          this.geolocationMessage.set('Permissão de localização negada. Autorize o acesso e tente capturar novamente.');
         } else if (geoError.code === geoError.TIMEOUT) {
           this.geolocationState.set('timeout');
-          this.geolocationMessage.set('A busca de localização demorou demais. Tente novamente ou use o mapa.');
+          this.geolocationMessage.set('A captura demorou demais. Tente novamente.');
         } else {
           this.geolocationState.set('unavailable');
-          this.geolocationMessage.set('Não foi possível obter a localização. Marque o ponto manualmente no mapa.');
+          this.geolocationMessage.set('Não foi possível capturar a localização. Tente novamente.');
         }
         this.notifications.error(this.geolocationMessage());
       }),
@@ -746,18 +801,33 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
   }
 
   locationHeadline(): string {
-    if (this.geolocationState() === 'loading') return 'Obtendo sua localização…';
+    if (this.geolocationState() === 'loading') return this.hasSelectedPoint() ? 'Atualizando localização…' : 'Capturando localização…';
     if (this.geolocationState() === 'denied') return 'Permissão de localização não concedida';
     if (this.geolocationState() === 'unavailable' || this.geolocationState() === 'timeout') return 'Não foi possível obter a localização';
-    if (this.hasSelectedPoint()) return this.locationSource() === 'map' ? 'Ponto selecionado no mapa' : 'Localização obtida com sucesso';
-    return 'Localização ainda não informada';
+    if (this.hasSelectedPoint()) return this.locationSource() === 'map' ? 'Ponto selecionado no mapa' : 'Localização capturada';
+    return 'Localização ainda não capturada';
   }
 
   locationAddress(): string {
+    if (!this.hasSelectedPoint()) return 'Toque em "Capturar localização" para obter as coordenadas pelo GPS.';
     if (this.form.manualAddress?.trim()) return this.form.manualAddress.trim();
     const street = [this.form.street, this.form.number].filter(Boolean).join(', ');
     const place = [this.form.neighborhood, this.form.city].filter(Boolean).join(', ');
-    return [street, place].filter(Boolean).join(' · ') || 'Use o GPS, o mapa ou busque um endereço.';
+    return [street, place].filter(Boolean).join(' · ') || 'Localização pronta para ser conferida no mapa.';
+  }
+
+  locationActionLabel(): string {
+    if (this.geolocationState() === 'loading') return this.hasSelectedPoint() ? 'Atualizando localização…' : 'Capturando localização…';
+    return this.hasSelectedPoint() ? 'Atualizar localização' : 'Capturar localização';
+  }
+
+  handleLocationAction(): void {
+    if (this.geolocationState() === 'loading') return;
+    if (this.hasSelectedPoint()) {
+      this.locationActionsOpen.set(true);
+      return;
+    }
+    this.useMyLocation();
   }
 
   locationStateLabel(): string {
@@ -806,7 +876,12 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
       return;
     }
     this.exporting.set(true);
-    this.api.exportVisits().pipe(finalize(() => this.exporting.set(false))).subscribe({
+    this.api.exportVisits({
+      neighborhood: this.filters.neighborhood || undefined,
+      wantsVisits: this.filters.wantsVisits || undefined,
+      from: this.toOffset(this.filters.from),
+      to: this.toOffset(this.filters.to)
+    }).pipe(finalize(() => this.exporting.set(false))).subscribe({
       next: (blob) => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -899,6 +974,10 @@ export class VisitsComponent implements AfterViewInit, OnDestroy {
     const date = new Date(value);
     const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
     return offsetDate.toISOString().slice(0, 16);
+  }
+
+  private toOffset(value: string): string | undefined {
+    return value ? new Date(value).toISOString() : undefined;
   }
 
   private setPoint(latitude: number, longitude: number): void {

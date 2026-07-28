@@ -822,7 +822,9 @@ h2 { font-size: 17px; }
 .territory-form-alert.warning > span { background: var(--color-warning); }
 .territory-form-alert div { display: grid; gap: 2px; }
 .territory-form-alert small { color: var(--text); line-height: 1.35; }
-.location-primary-actions, .location-address-action { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.location-primary-actions, .location-address-action { display: grid; gap: 8px; }
+.location-primary-actions { grid-template-columns: 1fr; }
+.location-primary-actions.has-location, .location-address-action { grid-template-columns: 1fr 1fr; }
 .technical-details { border-top: 1px solid var(--line); padding-top: 10px; }
 .technical-details summary { min-height: 44px; display: flex; align-items: center; color: var(--color-primary-readable); cursor: pointer; font-weight: 700; }
 .technical-details > small { color: var(--muted); }
@@ -1066,6 +1068,13 @@ app-date-range-filter { min-width: 0; display: block; }
 .date-range-chips button.active { border-color: var(--color-primary); background: var(--color-selected); color: var(--color-primary-readable); }
 .date-range-custom { min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .date-range-custom label { min-width: 0; display: grid; gap: 5px; color: var(--text); font-size: 12px; font-weight: 650; }
+.date-range-custom input[type="date"] {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 48px;
+  border-radius: 14px;
+  font-variant-numeric: tabular-nums;
+}
 .date-range-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .date-range-actions button { min-height: 42px; padding: 8px 16px; border-radius: 13px; }
 .metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
