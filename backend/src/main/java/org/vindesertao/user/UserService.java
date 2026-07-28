@@ -2,8 +2,10 @@ package org.vindesertao.user;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.WebApplicationException;
 import org.vindesertao.audit.AuditService;
 import org.vindesertao.auth.AuthService;
 import org.vindesertao.auth.CurrentUser;
@@ -41,14 +43,18 @@ public class UserService {
     @Inject
     AuditService auditService;
 
+    @Inject
+    EntityManager entityManager;
+
     @Transactional
     public AppUser create(UserDtos.CreateUserRequest request) {
-        users.findByEmail(request.email()).ifPresent(existing -> {
+        String normalizedEmail = normalizeEmail(request.email());
+        users.findByEmail(normalizedEmail).ifPresent(existing -> {
             throw new IllegalArgumentException("E-mail ja cadastrado.");
         });
         AppUser user = new AppUser();
         user.name = request.name();
-        user.email = request.email().toLowerCase();
+        user.email = normalizedEmail;
         user.passwordHash = authService.hashPassword(request.password());
         user.roles = rolesToString(request.roles());
         user.team = findTeam(request.teamId());
@@ -71,7 +77,14 @@ public class UserService {
                 .orElseThrow(() -> new NotFoundException("Usuario nao encontrado."));
         String before = snapshot(user);
         Team oldTeam = user.team;
+        String normalizedEmail = normalizeEmail(request.email());
+        users.findByEmail(normalizedEmail)
+                .filter(existing -> !existing.id.equals(user.id))
+                .ifPresent(existing -> {
+                    throw new IllegalArgumentException("E-mail ja cadastrado.");
+                });
         user.name = request.name();
+        user.email = normalizedEmail;
         user.roles = rolesToString(request.roles());
         Team newTeam = findTeam(request.teamId());
         user.team = newTeam;
@@ -94,6 +107,42 @@ public class UserService {
         syncMemberships(user, request.additionalTeamIds());
         auditService.log("UPDATE", "USER", user.id, before, snapshot(user));
         return user;
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        AppUser user = users.findByIdOptional(id)
+                .orElseThrow(() -> new NotFoundException("Usuario nao encontrado."));
+        if (currentUser.entity().id.equals(id)) {
+            throw new WebApplicationException("Voce nao pode excluir a propria conta.", 409);
+        }
+        if (hasLinkedOperationalRecords(id)) {
+            throw new WebApplicationException(
+                    "Este usuario possui visitas, atendimentos, lancamentos, cadastros infantis ou lideranca vinculados. "
+                            + "Transfira esses registros ou desative a conta.",
+                    409
+            );
+        }
+
+        String before = snapshot(user);
+        memberships.delete("user.id", id);
+        entityManager.createQuery("delete from PasswordResetToken token where token.user.id = :userId")
+                .setParameter("userId", id)
+                .executeUpdate();
+        entityManager.createQuery("update Inscricao registration set registration.usuario = null where registration.usuario.id = :userId")
+                .setParameter("userId", id)
+                .executeUpdate();
+        entityManager.createQuery("update UserTeamHistory history set history.changedBy = null where history.changedBy.id = :userId")
+                .setParameter("userId", id)
+                .executeUpdate();
+        entityManager.createQuery("delete from UserTeamHistory history where history.user.id = :userId")
+                .setParameter("userId", id)
+                .executeUpdate();
+        entityManager.createQuery("update AuditLog log set log.actor = null where log.actor.id = :userId")
+                .setParameter("userId", id)
+                .executeUpdate();
+        users.delete(user);
+        auditService.log("DELETE", "USER", id, before, null);
     }
 
     public UserDtos.UserResponse toResponse(AppUser user) {
@@ -142,6 +191,27 @@ public class UserService {
         }
         return teams.findByIdOptional(teamId)
                 .orElseThrow(() -> new IllegalArgumentException("Equipe invalida."));
+    }
+
+    private boolean hasLinkedOperationalRecords(Long userId) {
+        return count("Team", "leader.id", userId) > 0
+                || count("HouseholdVisit", "responsibleUser.id", userId) > 0
+                || count("SocialAssistanceRecord", "responsibleUser.id", userId) > 0
+                || count("FinancialTransaction", "responsibleUser.id", userId) > 0
+                || count("ChildRecord", "responsibleUser.id", userId) > 0;
+    }
+
+    private long count(String entity, String userField, Long userId) {
+        return entityManager.createQuery(
+                        "select count(record) from " + entity + " record where record." + userField + " = :userId",
+                        Long.class
+                )
+                .setParameter("userId", userId)
+                .getSingleResult();
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase();
     }
 
     private String rolesToString(Set<Role> roles) {

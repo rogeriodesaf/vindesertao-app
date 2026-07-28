@@ -62,6 +62,10 @@ export class ApiService {
     return this.http.put<AppUser>(`${environment.apiBaseUrl}/users/${user.id}`, payload);
   }
 
+  deleteUser(id: number) {
+    return this.http.delete<void>(`${environment.apiBaseUrl}/users/${id}`);
+  }
+
   userTeamHistory(userId: number) {
     return this.http.get<UserTeamHistory[]>(`${environment.apiBaseUrl}/users/${userId}/team-history`);
   }

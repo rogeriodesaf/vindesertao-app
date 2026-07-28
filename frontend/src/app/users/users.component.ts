@@ -2,13 +2,14 @@ import { Component, OnInit, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { SlicePipe } from '@angular/common';
 import { FormsModule, NgForm } from '@angular/forms';
+import { finalize } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { formatDateTime } from '../core/date-format';
 import { AppUser, Role, Team, UserSummary, UserTeamHistory } from '../core/models';
 import { NotificationService } from '../core/notification.service';
 import { CompactPaginationComponent } from '../shared/compact-pagination.component';
 import { EmptyStateComponent } from '../shared/empty-state.component';
-import { ListCardComponent } from '../shared/list-card.component';
+import { ListCardAction, ListCardComponent } from '../shared/list-card.component';
 
 const roles: Role[] = ['admin', 'lider', 'projetista'];
 
@@ -53,7 +54,7 @@ const roles: Role[] = ['admin', 'lider', 'projetista'];
         <form #userForm="ngForm" class="editor" novalidate (ngSubmit)="save(userForm)">
           <h2>{{ form.id ? 'Editar usuario' : 'Novo usuario' }}</h2>
           <label>Nome<input name="name" [(ngModel)]="form.name" required></label>
-          <label>E-mail<input name="email" type="email" [(ngModel)]="form.email" required [disabled]="!!form.id"></label>
+          <label>E-mail<input name="email" type="email" [(ngModel)]="form.email" required></label>
           <label>Senha<input name="password" type="password" minlength="8" [(ngModel)]="form.password" [required]="!form.id"></label>
           <p class="muted">Ao criar usuario ou redefinir senha, ele sera obrigado a trocar a senha no proximo acesso.</p>
           <label>Equipe
@@ -151,7 +152,7 @@ const roles: Role[] = ['admin', 'lider', 'projetista'];
           <div class="unified-list">
             @for (user of users(); track user.id) {
               <app-list-card [title]="user.name" [state]="user.active ? 'Ativo' : 'Inativo'" [interactive]="true"
-                [actions]="[{ id: 'edit', label: 'Editar', icon: 'edit' }]" (activate)="edit(user)" (action)="edit(user)"
+                [actions]="userActions(user)" [actionsInline]="true" (activate)="edit(user)" (action)="handleUserAction($event, user)"
                 [infos]="[{ icon: 'email', text: user.email }, { icon: 'groups', text: user.teamName || '-' }, { icon: 'groups', text: user.additionalTeamNames?.join(', ') || '' }, { icon: 'status', text: user.roles.join(', ') }, { icon: 'open', text: accessSummary(user) }, { icon: 'status', text: user.mustChangePassword ? 'Troca de senha pendente' : 'Senha definida' }]" />
             } @empty { <app-empty-state message="Nenhum usuário encontrado." /> }
           </div>
@@ -173,6 +174,7 @@ export class UsersComponent implements OnInit {
   teamHistory = signal<UserTeamHistory[]>([]);
   summary = signal<UserSummary | null>(null);
   mobileFormOpen = signal(false);
+  deletingId = signal<number | null>(null);
   showInactive = false;
   userSearch = '';
   appliedSearch = '';
@@ -223,6 +225,26 @@ export class UsersComponent implements OnInit {
     }
   }
 
+  handleUserAction(action: string, user: AppUser): void {
+    if (action === 'edit') {
+      this.edit(user);
+    } else if (action === 'delete') {
+      this.delete(user);
+    }
+  }
+
+  userActions(user: AppUser): ListCardAction[] {
+    return [
+      { id: 'edit', label: 'Editar', icon: 'edit' },
+      {
+        id: 'delete',
+        label: this.deletingId() === user.id ? 'Excluindo...' : 'Excluir',
+        icon: 'delete',
+        danger: true
+      }
+    ];
+  }
+
   newUser(): void {
     this.form = this.blank();
     this.teamHistory.set([]);
@@ -254,6 +276,39 @@ export class UsersComponent implements OnInit {
       },
       error: (response: HttpErrorResponse) => this.fail(this.errorMessage(response))
     });
+  }
+
+  delete(user: AppUser): void {
+    if (!user.id || this.deletingId() !== null) {
+      return;
+    }
+    if (!window.confirm(
+      `Excluir o usuario "${user.name}"? A exclusao so sera concluida se ele nao possuir registros ministeriais ou lideranca vinculados.`
+    )) {
+      return;
+    }
+
+    this.message.set('');
+    this.error.set('');
+    this.deletingId.set(user.id);
+    this.api.deleteUser(user.id)
+      .pipe(finalize(() => this.deletingId.set(null)))
+      .subscribe({
+        next: () => {
+          this.users.update((users) => users.filter((item) => item.id !== user.id));
+          this.total.update((total) => Math.max(0, total - 1));
+          if (this.form.id === user.id) {
+            this.form = this.blank();
+            this.teamHistory.set([]);
+          }
+          this.ok('Usuario excluido com sucesso.');
+          this.load();
+          this.loadSummary();
+        },
+        error: (response: HttpErrorResponse) => this.fail(
+          this.errorMessage(response, 'Nao foi possivel excluir o usuario.')
+        )
+      });
   }
 
   toggleRole(role: Role): void {
@@ -369,7 +424,7 @@ export class UsersComponent implements OnInit {
     this.form.additionalTeamIds = (this.form.additionalTeamIds || []).filter((id) => id !== this.form.teamId);
   }
 
-  private errorMessage(response: HttpErrorResponse): string {
+  private errorMessage(response: HttpErrorResponse, fallback = 'Nao foi possivel salvar o usuario. Revise os campos e tente novamente.'): string {
     if (response.status === 401) {
       return 'Sua sessao expirou. Faca login novamente.';
     }
@@ -383,7 +438,7 @@ export class UsersComponent implements OnInit {
     if (body?.violations?.length) {
       return body.violations.map((violation: { message: string }) => violation.message).join(' ');
     }
-    return 'Nao foi possivel salvar o usuario. Revise os campos e tente novamente.';
+    return fallback;
   }
 
   private ok(message: string): void {

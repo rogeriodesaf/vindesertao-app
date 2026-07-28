@@ -63,6 +63,7 @@ public class UserDtos {
 
     public record UpdateUserRequest(
             @NotBlank String name,
+            @Email @NotBlank String email,
             @NotEmpty Set<Role> roles,
             Long teamId,
             List<Long> additionalTeamIds,

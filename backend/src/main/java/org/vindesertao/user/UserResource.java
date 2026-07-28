@@ -6,6 +6,7 @@ import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import org.vindesertao.common.PageResponse;
 
 import java.util.List;
@@ -54,6 +55,13 @@ public class UserResource {
     @Path("/{id}")
     public UserDtos.UserResponse update(@PathParam("id") Long id, @Valid UserDtos.UpdateUserRequest request) {
         return userService.toResponse(userService.update(id, request));
+    }
+
+    @DELETE
+    @Path("/{id}")
+    public Response delete(@PathParam("id") Long id) {
+        userService.delete(id);
+        return Response.noContent().build();
     }
 
     @GET
