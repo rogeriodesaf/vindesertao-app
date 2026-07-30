@@ -63,8 +63,17 @@
 }
 
 * { box-sizing: border-box; }
-html { background: var(--color-background); }
-body { margin: 0; background: var(--bg); color: var(--text); }
+html {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  background: var(--color-background);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+body, app-root { width: 100%; max-width: 100%; min-width: 0; }
+body { margin: 0; overflow-x: hidden; background: var(--bg); color: var(--text); }
+app-root { display: block; }
 main { min-width: 0; }
 button, input, select, textarea { font: inherit; }
 button, .button {
@@ -1472,7 +1481,10 @@ tbody tr:hover { background: var(--color-hover); }
   body { padding-bottom: 66px; }
   button, .button, input, select { min-height: 44px; }
   .app-shell { display: block; min-height: 0; }
-  .app-content { min-height: calc(100vh - 66px); }
+  .app-content {
+    min-height: calc(100vh - 66px);
+    min-height: calc(100svh - 66px);
+  }
   .desktop-sidebar { display: none; }
   .mobile-topbar {
     position: sticky;
@@ -1609,7 +1621,12 @@ tbody tr:hover { background: var(--color-hover); }
   .unified-list { grid-template-columns: 1fr; gap: 10px; }
   .list-card { padding: 15px 16px; border-radius: 20px; box-shadow: 0 5px 16px color-mix(in srgb, var(--color-background) 16%, transparent); }
   .session { order: 3; flex: 1 1 100%; justify-content: space-between; }
-  .workspace { height: auto; min-height: calc(100vh - 124px); display: block; }
+  .workspace {
+    height: auto;
+    min-height: calc(100vh - 124px);
+    min-height: calc(100svh - 124px);
+    display: block;
+  }
   .workspace .map-panel { display: none; }
   .workspace.mobile-map-view .map-panel { display: block; height: calc(100vh - 124px); min-height: 430px; }
   .workspace.mobile-map-view .side-panel { display: none; }
@@ -1642,7 +1659,7 @@ tbody tr:hover { background: var(--color-hover); }
   }
   app-visits .workspace {
     height: auto;
-    min-height: calc(100dvh - 108px);
+    min-height: calc(100svh - 108px);
     max-width: 100%;
     overflow: visible;
   }
@@ -1652,7 +1669,7 @@ tbody tr:hover { background: var(--color-hover); }
     --map-mobile-notice-bottom: calc(94px + env(safe-area-inset-bottom, 0px));
     position: relative;
     width: 100%;
-    height: calc(100dvh - 184px - env(safe-area-inset-bottom));
+    height: calc(100svh - 184px - env(safe-area-inset-bottom));
     min-height: 460px;
     overflow: hidden;
   }

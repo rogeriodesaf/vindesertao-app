@@ -13,7 +13,8 @@ describe('DateRangeFilterComponent', () => {
   });
 
   it('exibe seletores nativos somente no modo personalizado', () => {
-    expect(fixture.nativeElement.querySelectorAll('input[type="date"]').length).toBe(2);
+    expect(component.preset).toBeNull();
+    expect(fixture.nativeElement.querySelector('.date-range-custom')).toBeNull();
 
     component.choosePreset('7days');
     fixture.detectChanges();
@@ -36,6 +37,8 @@ describe('DateRangeFilterComponent', () => {
   it('propaga a data selecionada pelo controle nativo', () => {
     const fromChange = jasmine.createSpy('fromChange');
     component.fromChange.subscribe(fromChange);
+    component.choosePreset('custom');
+    fixture.detectChanges();
     const input = fixture.nativeElement.querySelector('input[type="date"]') as HTMLInputElement;
 
     input.value = '2026-07-15';
@@ -43,5 +46,16 @@ describe('DateRangeFilterComponent', () => {
 
     expect(component.from).toBe('2026-07-15T00:00:00');
     expect(fromChange).toHaveBeenCalledWith('2026-07-15T00:00:00');
+  });
+
+  it('recolhe as datas ao limpar o filtro', () => {
+    component.choosePreset('custom');
+    fixture.detectChanges();
+
+    component.clearDates();
+    fixture.detectChanges();
+
+    expect(component.preset).toBeNull();
+    expect(fixture.nativeElement.querySelector('.date-range-custom')).toBeNull();
   });
 });

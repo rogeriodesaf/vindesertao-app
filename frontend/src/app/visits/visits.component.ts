@@ -343,6 +343,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   private photoBlobUrls = new WeakMap<Blob, string>();
   private createdPhotoUrls = new Set<string>();
   private mobileFormDraft: VisitFormDraft | null = null;
+  private reloadVisitsAfterCurrentRequest = false;
 
   constructor(
     public api: ApiService,
@@ -478,9 +479,18 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
       from: this.toOffset(this.filters.from),
       to: this.toOffset(this.filters.to)
     })
-      .pipe(finalize(() => this.loadingVisits.set(false)))
+      .pipe(finalize(() => {
+        this.loadingVisits.set(false);
+        if (this.reloadVisitsAfterCurrentRequest) {
+          this.reloadVisitsAfterCurrentRequest = false;
+          queueMicrotask(() => this.loadVisits());
+        }
+      }))
       .subscribe({
         next: (page) => {
+          if (this.reloadVisitsAfterCurrentRequest) {
+            return;
+          }
           this.visits.set(page.items);
           this.renderMarkers(page.items);
           this.refreshMapView();
@@ -544,6 +554,25 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
       if (to !== null && (createdAt === null || createdAt > to)) return false;
       return true;
     });
+  }
+
+  private showSavedVisitImmediately(savedVisit: Visit): void {
+    this.visits.update(items => {
+      const withoutSavedVisit = items.filter(item => item.id !== savedVisit.id);
+      return this.filterCachedVisits([savedVisit]).length
+        ? [savedVisit, ...withoutSavedVisit]
+        : withoutSavedVisit;
+    });
+    this.renderMarkers(this.visits());
+    this.refreshMapView();
+  }
+
+  private refreshVisitsAfterSave(): void {
+    if (this.loadingVisits()) {
+      this.reloadVisitsAfterCurrentRequest = true;
+      return;
+    }
+    this.loadVisits();
   }
 
   private hasVisitFilters(): boolean {
@@ -646,12 +675,9 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
       next: (savedVisit) => {
         this.saving.set(false);
         this.ok(editing ? 'Ficha de visita atualizada com sucesso.' : 'Ficha de visita salva com sucesso.');
-        if (editing) {
-          this.visits.update(items => items.map(item => item.id === savedVisit.id ? savedVisit : item));
-          this.renderMarkers(this.visits());
-        }
+        this.showSavedVisitImmediately(savedVisit);
         this.resetForm();
-        this.loadVisits();
+        this.refreshVisitsAfterSave();
       },
       error: (response: HttpErrorResponse) => this.handleSaveError(response, payload, editing)
     });

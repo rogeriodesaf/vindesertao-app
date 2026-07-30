@@ -50,7 +50,7 @@ export class DateRangeFilterComponent {
   @Output() toChange = new EventEmitter<string>();
   @Output() filter = new EventEmitter<void>();
   @Output() clear = new EventEmitter<void>();
-  preset: DateRangePreset = 'custom';
+  preset: DateRangePreset | null = null;
 
   choosePreset(preset: DateRangePreset): void {
     this.preset = preset;
@@ -67,7 +67,7 @@ export class DateRangeFilterComponent {
   setCustomTo(value: string): void { this.to = this.outputValue(value, true); this.toChange.emit(this.to); }
 
   clearDates(): void {
-    this.preset = 'custom';
+    this.preset = null;
     this.setDates('', '');
     this.clear.emit();
   }
