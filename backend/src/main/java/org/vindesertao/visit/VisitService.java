@@ -118,8 +118,9 @@ public class VisitService {
         if (!currentUser.isAdmin()) {
             Set<Long> visibleTeamIds = visibleVisitTeamIds(user);
             if (!visibleTeamIds.isEmpty()) {
-                where.add("team.id in :visibleTeamIds");
+                where.add("(team.id in :visibleTeamIds or responsibleUser.id = :currentUserId)");
                 params.and("visibleTeamIds", visibleTeamIds);
+                params.and("currentUserId", user.id);
             } else {
                 where.add("responsibleUser.id = :currentUserId");
                 params.and("currentUserId", user.id);

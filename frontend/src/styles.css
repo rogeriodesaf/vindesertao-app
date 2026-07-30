@@ -1480,6 +1480,7 @@ tbody tr:hover { background: var(--color-hover); }
 @media (max-width: 900px) {
   body { padding-bottom: 66px; }
   button, .button, input, select { min-height: 44px; }
+  input, select, textarea { font-size: 16px; }
   .app-shell { display: block; min-height: 0; }
   .app-content {
     min-height: calc(100vh - 66px);

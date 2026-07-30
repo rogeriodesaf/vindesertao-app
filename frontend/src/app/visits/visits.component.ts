@@ -575,6 +575,13 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadVisits();
   }
 
+  private openVisitListAfterSave(): void {
+    this.openSection.set('visits');
+    requestAnimationFrame(() => {
+      document.getElementById('visit-team-history')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   private hasVisitFilters(): boolean {
     return !!(this.filters.neighborhood.trim() || this.filters.wantsVisits || this.filters.from || this.filters.to);
   }
@@ -677,6 +684,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
         this.ok(editing ? 'Ficha de visita atualizada com sucesso.' : 'Ficha de visita salva com sucesso.');
         this.showSavedVisitImmediately(savedVisit);
         this.resetForm();
+        this.openVisitListAfterSave();
         this.refreshVisitsAfterSave();
       },
       error: (response: HttpErrorResponse) => this.handleSaveError(response, payload, editing)

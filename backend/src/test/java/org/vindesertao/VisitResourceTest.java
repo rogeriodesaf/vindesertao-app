@@ -4,7 +4,10 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.security.TestSecurity;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.restassured.http.ContentType;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
+import org.vindesertao.team.Team;
 import org.vindesertao.user.AppUser;
 import org.vindesertao.visit.HouseholdVisit;
 
@@ -13,9 +16,15 @@ import java.time.OffsetDateTime;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.hasItem;
 
 @QuarkusTest
 class VisitResourceTest {
+    private static final long OTHER_TEAM_ID = 9002L;
+
+    @Inject
+    EntityManager entityManager;
+
     @Test
     @TestSecurity(user = "admin@vindesertao.local", roles = "admin")
     void adminListsVisitsButDoesNotCreateVisitSheets() {
@@ -96,5 +105,46 @@ class VisitResourceTest {
                 .get("/visits/" + visitId)
                 .then()
                 .statusCode(404);
+    }
+
+    @Test
+    @TestSecurity(user = "lider@vindesertao.local", roles = "lider")
+    void userStillListsOwnVisitWhenItBelongsToAnotherTeam() {
+        Long[] ids = QuarkusTransaction.requiringNew().call(() -> {
+            AppUser leader = AppUser.<AppUser>find("email", "lider@vindesertao.local").firstResult();
+            entityManager.createNativeQuery("""
+                    insert into teams(id, name, team_type, can_register_visits)
+                    values (:id, :name, 'EVANGELISM', true)
+                    """)
+                    .setParameter("id", OTHER_TEAM_ID)
+                    .setParameter("name", "Equipe temporária da própria visita")
+                    .executeUpdate();
+            Team otherTeam = Team.findById(OTHER_TEAM_ID);
+
+            HouseholdVisit visit = new HouseholdVisit();
+            visit.personName = "Visita própria em outra equipe";
+            visit.city = "Sertao";
+            visit.wantsVisits = true;
+            visit.responsibleUser = leader;
+            visit.team = otherTeam;
+            visit.createdAt = OffsetDateTime.now();
+            visit.createdBy = leader.email;
+            visit.persist();
+            return new Long[]{visit.id, otherTeam.id};
+        });
+
+        try {
+            given()
+                    .when()
+                    .get("/visits?page=0&size=100")
+                    .then()
+                    .statusCode(200)
+                    .body("items.id", hasItem(ids[0].intValue()));
+        } finally {
+            QuarkusTransaction.requiringNew().run(() -> {
+                HouseholdVisit.deleteById(ids[0]);
+                Team.deleteById(ids[1]);
+            });
+        }
     }
 }
