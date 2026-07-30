@@ -259,6 +259,13 @@ interface VisitFormDraft {
             @if (visit.streetViewUrl) { <div><dt>Street View</dt><dd><a [href]="visit.streetViewUrl" target="_blank" rel="noopener">Abrir localização</a></dd></div> }
             @if (visit.updatedAt) { <div><dt>Última atualização</dt><dd>{{ formatDate(visit.updatedAt) }}</dd></div> }
           </dl>
+          @if (isAdmin()) {
+            <div class="actions">
+              <button type="button" (click)="edit(visit)">Editar</button>
+              <button type="button" class="secondary" [disabled]="deletingId() === visit.id"
+                (click)="deleteVisit(visit)">{{ deletingId() === visit.id ? 'Excluindo...' : 'Excluir' }}</button>
+            </div>
+          }
         </section>
       </div>
     }
@@ -654,6 +661,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!visit.id) {
       return;
     }
+    this.closeVisitDetails();
     this.clearVisitDraft();
     this.api.visit(visit.id).subscribe((fullVisit) => {
       const editingAsAdmin = this.isAdmin();
@@ -708,14 +716,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   selectVisit(visit: Visit): void {
-    if (this.canEditVisit(visit)) {
-      this.edit(visit);
-      return;
-    }
-    if (visit.latitude && visit.longitude) {
-      this.map?.setView([visit.latitude, visit.longitude], 18);
-      this.scrollMapIntoView();
-    }
+    this.openVisitDetails(visit);
   }
 
   resetForm(): void {
@@ -1017,14 +1018,6 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
 
   canModifyVisit(): boolean {
     return this.canManageVisits() || this.adminEditing();
-  }
-
-  canEditVisit(visit: Visit): boolean {
-    const user = this.auth.user();
-    if (!user || user.roles.includes('admin')) {
-      return false;
-    }
-    return user.roles.includes('lider');
   }
 
   visitListTitle(): string {

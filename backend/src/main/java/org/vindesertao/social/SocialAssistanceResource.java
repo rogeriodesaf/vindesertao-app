@@ -10,6 +10,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.vindesertao.auth.CurrentUser;
 import org.vindesertao.common.PageResponse;
+import org.vindesertao.team.TeamDtos;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -66,6 +67,14 @@ public class SocialAssistanceResource {
     }
 
     @GET
+    @Path("/teams")
+    public List<TeamDtos.TeamResponse> teams() {
+        return service.availableTeams().stream()
+                .map(TeamDtos.TeamResponse::from)
+                .toList();
+    }
+
+    @GET
     @Path("/{id}")
     public SocialAssistanceDtos.SocialAssistanceResponse get(@PathParam("id") Long id) {
         return SocialAssistanceDtos.SocialAssistanceResponse.from(service.getAllowed(id, false, currentUser.entity()));
@@ -81,6 +90,13 @@ public class SocialAssistanceResource {
     public SocialAssistanceDtos.SocialAssistanceResponse update(@PathParam("id") Long id,
                                                                 @Valid SocialAssistanceDtos.SocialAssistanceRequest request) {
         return SocialAssistanceDtos.SocialAssistanceResponse.from(service.update(id, request));
+    }
+
+    @DELETE
+    @Path("/{id}")
+    public Response delete(@PathParam("id") Long id) {
+        service.delete(id);
+        return Response.noContent().build();
     }
 
     @GET

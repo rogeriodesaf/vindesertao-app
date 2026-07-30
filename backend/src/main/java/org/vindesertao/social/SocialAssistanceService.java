@@ -153,6 +153,17 @@ public class SocialAssistanceService {
         return ids;
     }
 
+    public List<Team> availableTeams() {
+        if (currentUser.isAdmin()) {
+            return teams.find("teamType = ?1 order by name", TeamType.SOCIAL_ACTION).list();
+        }
+        Set<Long> visibleIds = visibleSocialTeamIds(currentUser.entity());
+        if (visibleIds.isEmpty()) {
+            return List.of();
+        }
+        return teams.find("id in ?1 order by name", visibleIds).list();
+    }
+
     public static String label(SocialServiceType type) {
         if (type == null) {
             return "-";
@@ -177,6 +188,15 @@ public class SocialAssistanceService {
         record.city = request.city();
         record.serviceType = request.serviceType();
         record.notes = request.notes();
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        AppUser user = currentUser.entity();
+        SocialAssistanceRecord record = getAllowed(id, true, user);
+        String before = snapshot(record);
+        records.delete(record);
+        auditService.log("DELETE", "SOCIAL_ASSISTANCE", id, before, null);
     }
 
     private Team resolveSocialTeam(AppUser user, Long requestedTeamId) {

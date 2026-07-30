@@ -9,7 +9,7 @@ import { NotificationService } from '../core/notification.service';
 import { CompactPaginationComponent } from '../shared/compact-pagination.component';
 import { DateRangeFilterComponent } from '../shared/date-range-filter.component';
 import { EmptyStateComponent } from '../shared/empty-state.component';
-import { ListCardComponent } from '../shared/list-card.component';
+import { ListCardAction, ListCardComponent } from '../shared/list-card.component';
 
 @Component({
   selector: 'app-social-assistance',
@@ -105,12 +105,20 @@ import { ListCardComponent } from '../shared/list-card.component';
                   </select>
                 </label>
                 <label for="social-team">Equipe
-                  <select id="social-team" name="teamId" [(ngModel)]="form.teamId">
-                    <option [ngValue]="undefined">Selecionar automaticamente</option>
+                  <select id="social-team" name="teamId" [(ngModel)]="form.teamId" required
+                    [disabled]="teamsLoading() || socialTeams().length === 0">
+                    @if (socialTeams().length > 1) {
+                      <option [ngValue]="undefined" disabled>Selecione uma equipe</option>
+                    }
                     @for (team of socialTeams(); track team.id) {
                       <option [ngValue]="team.id">{{ team.name }}</option>
                     }
                   </select>
+                  @if (teamsLoading()) {
+                    <small class="muted">Carregando equipes...</small>
+                  } @else if (socialTeams().length === 0) {
+                    <small class="field-error" role="alert">Nenhuma equipe cadastrada.</small>
+                  }
                 </label>
               </div>
             </fieldset>
@@ -123,7 +131,7 @@ import { ListCardComponent } from '../shared/list-card.component';
             </fieldset>
 
             <div class="actions social-form-actions">
-              <button type="submit" [class.loading]="saving()" [disabled]="saving()">
+              <button type="submit" [class.loading]="saving()" [disabled]="saving() || teamsLoading() || socialTeams().length === 0">
                 {{ saving() ? 'Salvando...' : 'Salvar atendimento' }}
               </button>
               <button type="button" class="secondary" [disabled]="saving()" (click)="reset(socialForm)">Limpar</button>
@@ -205,7 +213,8 @@ import { ListCardComponent } from '../shared/list-card.component';
             <div class="unified-list">
               @for (record of records(); track record.id) {
                 <app-list-card [title]="record.assistedPersonName" [interactive]="true"
-                  [actions]="[{ id: 'edit', label: 'Editar', icon: 'edit' }]" (activate)="edit(record)" (action)="edit(record)"
+                  [actions]="recordActions(record)" [actionsInline]="true" (activate)="view(record)"
+                  (action)="handleRecordAction(record, $event)"
                   [infos]="[
                     { icon: 'service', text: record.serviceTypeLabel },
                     { icon: 'phone', text: formatPhone(record.phone) || 'Telefone não informado' },
@@ -224,6 +233,39 @@ import { ListCardComponent } from '../shared/list-card.component';
         </section>
       }
     </section>
+
+    @if (selectedRecord(); as record) {
+      <div class="visit-details-backdrop" (click)="closeDetails()">
+        <section class="visit-details-modal" role="dialog" aria-modal="true" aria-labelledby="social-details-title"
+          (click)="$event.stopPropagation()">
+          <div class="visit-details-head">
+            <div>
+              <small>Detalhes do atendimento</small>
+              <h2 id="social-details-title">{{ record.assistedPersonName }}</h2>
+            </div>
+            <button type="button" class="icon-button" aria-label="Fechar detalhes" (click)="closeDetails()">×</button>
+          </div>
+          <dl class="visit-details-grid">
+            <div><dt>Nome</dt><dd>{{ record.assistedPersonName }}</dd></div>
+            <div><dt>Telefone</dt><dd>{{ formatPhone(record.phone) || 'Não informado' }}</dd></div>
+            <div><dt>Idade</dt><dd>{{ record.age !== undefined ? record.age + ' ano(s)' : 'Não informada' }}</dd></div>
+            <div><dt>Local</dt><dd>{{ record.neighborhood || 'Bairro não informado' }} · {{ record.city }}</dd></div>
+            <div><dt>Tipo</dt><dd>{{ record.serviceTypeLabel || serviceLabel(record.serviceType) }}</dd></div>
+            <div><dt>Equipe</dt><dd>{{ record.teamName || 'Não informada' }}</dd></div>
+            <div><dt>Responsável pelo cadastro</dt><dd>{{ record.responsibleUserName || 'Não informado' }}</dd></div>
+            <div><dt>Data do cadastro</dt><dd>{{ formatDate(record.createdAt) }}</dd></div>
+            @if (record.notes) { <div class="wide"><dt>Observações</dt><dd>{{ record.notes }}</dd></div> }
+          </dl>
+          @if (canModifyRecord(record)) {
+            <div class="actions">
+              <button type="button" (click)="edit(record)">Editar</button>
+              <button type="button" class="secondary" [disabled]="deletingId() === record.id"
+                (click)="delete(record)">{{ deletingId() === record.id ? 'Excluindo...' : 'Excluir' }}</button>
+            </div>
+          }
+        </section>
+      </div>
+    }
   `
 })
 export class SocialAssistanceComponent implements OnInit {
@@ -234,8 +276,11 @@ export class SocialAssistanceComponent implements OnInit {
   message = signal('');
   error = signal('');
   loading = signal(false);
+  teamsLoading = signal(false);
   saving = signal(false);
   exporting = signal(false);
+  deletingId = signal<number | null>(null);
+  selectedRecord = signal<SocialAssistanceRecord | null>(null);
   filtersOpen = signal(true);
   form: SocialAssistanceRecord = this.blank();
   from = '';
@@ -260,9 +305,7 @@ export class SocialAssistanceComponent implements OnInit {
   constructor(private api: ApiService, public auth: AuthService, private notifications: NotificationService) {}
 
   ngOnInit(): void {
-    if (this.auth.user()?.roles.includes('admin')) {
-      this.api.teams().subscribe(teams => this.teams.set(teams));
-    }
+    this.loadTeams();
     this.applyFilters(false);
   }
 
@@ -282,6 +325,7 @@ export class SocialAssistanceComponent implements OnInit {
   }
 
   newRecord(): void {
+    this.closeDetails();
     this.reset();
     this.message.set('');
     this.openFormOnMobile();
@@ -290,8 +334,12 @@ export class SocialAssistanceComponent implements OnInit {
   save(form: NgForm): void {
     this.message.set('');
     this.error.set('');
+    if (this.socialTeams().length === 0) {
+      this.fail('Nenhuma equipe cadastrada. Solicite ao administrador o cadastro ou vínculo de uma equipe de ação social.');
+      return;
+    }
     if (form.invalid) {
-      this.fail('Preencha pelo menos nome, cidade e tipo de atendimento.');
+      this.fail('Preencha nome, cidade, tipo de atendimento e equipe.');
       return;
     }
     const editing = !!this.form.id;
@@ -314,8 +362,59 @@ export class SocialAssistanceComponent implements OnInit {
   }
 
   edit(record: SocialAssistanceRecord): void {
+    this.closeDetails();
     this.form = { ...record, phone: this.formatPhone(record.phone), quantity: 1 };
     this.openFormOnMobile();
+  }
+
+  view(record: SocialAssistanceRecord): void {
+    this.selectedRecord.set(record);
+  }
+
+  closeDetails(): void {
+    this.selectedRecord.set(null);
+  }
+
+  canModifyRecord(record: SocialAssistanceRecord): boolean {
+    const user = this.auth.user();
+    return !!user && (
+      user.roles.includes('admin') ||
+      user.roles.includes('lider') ||
+      record.responsibleUserId === user.id
+    );
+  }
+
+  recordActions(record: SocialAssistanceRecord): ListCardAction[] {
+    if (!this.canModifyRecord(record)) return [];
+    return [
+      { id: 'edit', label: 'Editar', icon: 'edit' },
+      {
+        id: 'delete',
+        label: this.deletingId() === record.id ? 'Excluindo...' : 'Excluir',
+        icon: 'delete',
+        danger: true
+      }
+    ];
+  }
+
+  handleRecordAction(record: SocialAssistanceRecord, action: string): void {
+    if (action === 'edit') this.edit(record);
+    if (action === 'delete') this.delete(record);
+  }
+
+  delete(record: SocialAssistanceRecord): void {
+    if (!record.id || !this.canModifyRecord(record) || this.deletingId()) return;
+    if (!window.confirm(`Excluir o atendimento de ${record.assistedPersonName}? Esta ação não pode ser desfeita.`)) return;
+    this.deletingId.set(record.id);
+    this.api.deleteSocialAssistance(record.id).pipe(finalize(() => this.deletingId.set(null))).subscribe({
+      next: () => {
+        this.closeDetails();
+        this.notifications.success('Atendimento social excluído com sucesso.');
+        if (this.records().length === 1 && this.currentPage > 0) this.currentPage--;
+        this.fetchData();
+      },
+      error: error => this.fail(this.errorMessage(error))
+    });
   }
 
   reset(form?: NgForm): void {
@@ -435,7 +534,7 @@ export class SocialAssistanceComponent implements OnInit {
       .map(([label, total]) => ({ label, total }));
   }
 
-  private serviceLabel(serviceType: SocialServiceType): string {
+  serviceLabel(serviceType: SocialServiceType): string {
     return this.serviceTypes.find(type => type.value === serviceType)?.label || 'Não informado';
   }
 
@@ -452,8 +551,29 @@ export class SocialAssistanceComponent implements OnInit {
       assistedPersonName: '',
       city: 'Sertão',
       serviceType: 'MEDICAL',
-      quantity: 1
+      quantity: 1,
+      teamId: this.socialTeams().length === 1 ? this.socialTeams()[0].id : undefined
     };
+  }
+
+  private loadTeams(): void {
+    this.teamsLoading.set(true);
+    this.api.socialAssistanceTeams().pipe(finalize(() => this.teamsLoading.set(false))).subscribe({
+      next: teams => {
+        const available = teams.filter(team => team.id !== undefined && team.teamType === 'SOCIAL_ACTION');
+        this.teams.set(available);
+        const selectedIsAvailable = available.some(team => team.id === this.form.teamId);
+        if (available.length === 1 && !selectedIsAvailable) {
+          this.form = { ...this.form, teamId: available[0].id };
+        } else if (this.form.teamId && !selectedIsAvailable) {
+          this.form = { ...this.form, teamId: undefined };
+        }
+      },
+      error: () => {
+        this.teams.set([]);
+        this.fail('Não foi possível carregar as equipes de ação social.');
+      }
+    });
   }
 
   private phoneDigits(value?: string): string | undefined {

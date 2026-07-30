@@ -211,7 +211,7 @@ const CHILD_ACTIVITIES = ['EBF', 'Culto Infantil', 'Recreação', 'Evangelismo',
             <div class="unified-list children-list">
               @for (record of records(); track record.id) {
                 <app-list-card [title]="record.childName" [interactive]="true" [state]="record.photoUrl ? 'Foto disponível' : ''"
-                  [actions]="recordActions(record)" [actionsInline]="true" (activate)="edit(record)"
+                  [actions]="recordActions(record)" [actionsInline]="true" (activate)="view(record)"
                   (action)="handleRecordAction(record, $event)" [infos]="recordInfos(record)" />
               } @empty {
                 <app-empty-state message="Nenhum cadastro infantil encontrado." />
@@ -223,6 +223,41 @@ const CHILD_ACTIVITIES = ['EBF', 'Culto Infantil', 'Recreação', 'Evangelismo',
         </section>
       }
     </section>
+
+    @if (selectedRecord(); as record) {
+      <div class="visit-details-backdrop" (click)="closeDetails()">
+        <section class="visit-details-modal" role="dialog" aria-modal="true" aria-labelledby="children-details-title"
+          (click)="$event.stopPropagation()">
+          <div class="visit-details-head">
+            <div>
+              <small>Detalhes da criança</small>
+              <h2 id="children-details-title">{{ record.childName }}</h2>
+            </div>
+            <button type="button" class="icon-button" aria-label="Fechar detalhes" (click)="closeDetails()">×</button>
+          </div>
+          <dl class="visit-details-grid">
+            <div><dt>Nome</dt><dd>{{ record.childName }}</dd></div>
+            <div><dt>Idade</dt><dd>{{ record.age === undefined ? 'Não informada' : record.age + ' ano(s)' }}</dd></div>
+            <div><dt>Sexo</dt><dd>{{ genderLabel(record.gender) }}</dd></div>
+            <div><dt>Responsável</dt><dd>{{ record.guardianName || 'Não informado' }}</dd></div>
+            <div><dt>Telefone</dt><dd>{{ formatPhone(record.guardianPhone) || 'Não informado' }}</dd></div>
+            <div><dt>Atividade</dt><dd>{{ record.activityName || 'Não informada' }}</dd></div>
+            <div><dt>Local</dt><dd>{{ record.neighborhood || 'Bairro não informado' }} · {{ record.city }}</dd></div>
+            <div><dt>Responsável pelo cadastro</dt><dd>{{ record.responsibleUserName || 'Não informado' }}</dd></div>
+            <div><dt>Data do cadastro</dt><dd>{{ formatDate(record.createdAt) }}</dd></div>
+            @if (record.notes) { <div class="wide"><dt>Observações</dt><dd>{{ record.notes }}</dd></div> }
+          </dl>
+          <div class="actions">
+            <button type="button" (click)="edit(record)">Editar</button>
+            @if (record.photoUrl) {
+              <button type="button" class="secondary" (click)="showPhoto(record)">Visualizar foto</button>
+            }
+            <button type="button" class="secondary" [disabled]="deletingId() === record.id"
+              (click)="delete(record)">{{ deletingId() === record.id ? 'Excluindo...' : 'Excluir' }}</button>
+          </div>
+        </section>
+      </div>
+    }
 
     @if (photoViewer(); as photo) {
       <div class="children-photo-backdrop" (click)="closePhoto()">
@@ -253,6 +288,7 @@ export class ChildrenComponent implements OnInit {
   exportingPdf = signal(false);
   deletingId = signal<number | null>(null);
   photoViewer = signal<{ url: string; name: string } | null>(null);
+  selectedRecord = signal<ChildRecord | null>(null);
   form: ChildRecord = this.blank();
   ageInput = '';
   from = '';
@@ -280,6 +316,7 @@ export class ChildrenComponent implements OnInit {
   }
 
   newRecord(): void {
+    this.closeDetails();
     this.reset();
     this.message.set('');
     this.openForm();
@@ -317,6 +354,7 @@ export class ChildrenComponent implements OnInit {
   }
 
   edit(record: ChildRecord): void {
+    this.closeDetails();
     this.message.set('');
     this.form = { ...record, guardianPhone: this.formatPhone(record.guardianPhone) };
     this.ageInput = record.age === undefined ? '' : String(record.age);
@@ -328,6 +366,7 @@ export class ChildrenComponent implements OnInit {
     this.deletingId.set(record.id);
     this.api.deleteChild(record.id).pipe(finalize(() => this.deletingId.set(null))).subscribe({
       next: () => {
+        this.closeDetails();
         this.notifications.success('Cadastro infantil excluído com sucesso.');
         if (this.records().length === 1 && this.currentPage > 0) this.currentPage--;
         this.fetchData();
@@ -447,7 +486,25 @@ export class ChildrenComponent implements OnInit {
   handleRecordAction(record: ChildRecord, action: string): void {
     if (action === 'edit') this.edit(record);
     if (action === 'delete') this.delete(record);
-    if (action === 'photo' && record.photoUrl) this.photoViewer.set({ url: record.photoUrl, name: record.childName });
+    if (action === 'photo') this.showPhoto(record);
+  }
+
+  view(record: ChildRecord): void {
+    this.selectedRecord.set(record);
+  }
+
+  closeDetails(): void {
+    this.selectedRecord.set(null);
+  }
+
+  showPhoto(record: ChildRecord): void {
+    if (record.photoUrl) this.photoViewer.set({ url: record.photoUrl, name: record.childName });
+  }
+
+  genderLabel(gender?: ChildRecord['gender']): string {
+    if (gender === 'MALE') return 'Menino';
+    if (gender === 'FEMALE') return 'Menina';
+    return 'Não informado';
   }
 
   closePhoto(): void {
@@ -513,7 +570,7 @@ export class ChildrenComponent implements OnInit {
     return digits || undefined;
   }
 
-  private formatPhone(value?: string): string {
+  formatPhone(value?: string): string {
     const digits = this.phoneDigits(value) || '';
     if (!digits) return '';
     if (digits.length <= 2) return `(${digits}`;

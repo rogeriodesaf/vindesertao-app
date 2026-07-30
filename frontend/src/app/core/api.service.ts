@@ -126,12 +126,20 @@ export class ApiService {
     return this.http.get<SocialAssistanceSummary>(`${environment.apiBaseUrl}/social-assistance/summary`, { params: this.params(params) });
   }
 
+  socialAssistanceTeams() {
+    return this.http.get<Team[]>(`${environment.apiBaseUrl}/social-assistance/teams`);
+  }
+
   createSocialAssistance(record: SocialAssistanceRecord) {
     return this.http.post<SocialAssistanceRecord>(`${environment.apiBaseUrl}/social-assistance`, record);
   }
 
   updateSocialAssistance(record: SocialAssistanceRecord) {
     return this.http.put<SocialAssistanceRecord>(`${environment.apiBaseUrl}/social-assistance/${record.id}`, record);
+  }
+
+  deleteSocialAssistance(id: number) {
+    return this.http.delete<void>(`${environment.apiBaseUrl}/social-assistance/${id}`);
   }
 
   exportSocialAssistance(params: Record<string, string | number | undefined> = {}) {
