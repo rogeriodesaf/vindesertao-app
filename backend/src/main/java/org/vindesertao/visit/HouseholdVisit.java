@@ -81,6 +81,9 @@ public class HouseholdVisit extends PanacheEntityBase {
     @Column(name = "street_view_url")
     public String streetViewUrl;
 
+    @Column(name = "client_reference", unique = true, length = 80)
+    public String clientReference;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "responsible_user_id", nullable = false)
     public AppUser responsibleUser;

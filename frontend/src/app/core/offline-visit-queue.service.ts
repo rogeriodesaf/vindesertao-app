@@ -44,7 +44,8 @@ export function normalizeOfflineVisit(source: Visit): Visit {
     photoUrl: optionalString(value.photoUrl),
     photoContentType: optionalString(value.photoContentType) || (photoData ? dataUrlContentType(photoData) : undefined),
     photoFileName: optionalString(value.photoFileName) || (photoData ? 'ficha-offline.jpg' : undefined),
-    streetViewUrl: optionalString(value.streetViewUrl)
+    streetViewUrl: optionalString(value.streetViewUrl),
+    clientReference: optionalString(value.clientReference)
   };
 }
 
@@ -84,7 +85,7 @@ export class OfflineVisitQueueService {
     const db = await this.db();
     await this.write(db, 'readwrite', (store) => {
       store.add({
-        visit: normalizeOfflineVisit(visit),
+        visit: normalizeOfflineVisit({ ...visit, clientReference: visit.clientReference || this.clientReference() }),
         createdAt: new Date().toISOString(),
         attempts: 0
       });
@@ -265,6 +266,11 @@ export class OfflineVisitQueueService {
       return error.message;
     }
     return String(error);
+  }
+
+  private clientReference(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return `offline-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 }
 

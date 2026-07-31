@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/@angular/service-worker/config/schema.json",
   "appData": {
-    "version": "offline-map-rio-tinto-joao-pessoa-v2"
+    "version": "territory-distribution-offline-v3"
   },
   "index": "/index.html",
   "assetGroups": [
@@ -37,6 +37,20 @@
           "/assets/**",
           "/*.(svg|png|jpg|webp)"
         ]
+      }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "offline-visit-photos",
+      "urls": [
+        "https://res.cloudinary.com/**"
+      ],
+      "cacheConfig": {
+        "strategy": "performance",
+        "maxSize": 500,
+        "maxAge": "30d",
+        "timeout": "5s"
       }
     }
   ],

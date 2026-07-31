@@ -6,6 +6,7 @@ export interface UserPrincipal {
   email: string;
   roles: Role[];
   teamId?: number;
+  visitTeamIds?: number[];
   mustChangePassword: boolean;
   canRegisterVisits: boolean;
   canViewReports: boolean;
@@ -52,6 +53,7 @@ export interface Visit {
   photoContentType?: string;
   photoFileName?: string;
   streetViewUrl?: string;
+  clientReference?: string;
   responsibleUserId?: number;
   responsibleUserName?: string;
   teamId?: number;
@@ -137,6 +139,53 @@ export interface Territory {
   polygonGeoJson: string;
   active: boolean;
   enforceForProjectists: boolean;
+  generated?: boolean;
+  distributionVersion?: string;
+  publishedAt?: string;
+  houseCount?: number;
+  locatedHouseCount?: number;
+  coverageStatus?: 'COMPLETA' | 'PARCIAL' | 'SEM_CASAS';
+}
+
+export interface TerritoryDistributionHouse {
+  visitId: number;
+  personName: string;
+  street?: string;
+  number?: string;
+  neighborhood?: string;
+  latitude?: number;
+  longitude?: number;
+  teamId: number;
+}
+
+export interface TerritoryDistributionArea {
+  teamId: number;
+  teamName: string;
+  color: string;
+  polygonGeoJson: string;
+  houseCount: number;
+  locatedHouseCount: number;
+  coverageStatus: 'COMPLETA' | 'PARCIAL' | 'SEM_COORDENADAS';
+  houses: TerritoryDistributionHouse[];
+}
+
+export interface TerritoryDistributionPlan {
+  draftId: number;
+  version: string;
+  generatedAt: string;
+  requestedTeamCount: number;
+  totalHouses: number;
+  locatedHouses: number;
+  unlocatedHouses: number;
+  minimumHouses: number;
+  maximumHouses: number;
+  imbalanced: boolean;
+  areas: TerritoryDistributionArea[];
+}
+
+export interface TerritoryDistributionRequest {
+  teamIds: number[];
+  visitAssignments?: Record<number, number>;
 }
 
 export interface DuplicateVisitGroup {

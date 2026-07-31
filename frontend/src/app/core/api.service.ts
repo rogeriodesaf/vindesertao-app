@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { environment } from '../../environments/environment';
-import { AppUser, AuditLog, ChildRecord, ChildrenSummary, Dashboard, DuplicateVisitGroup, FinanceSummary, FinancialTransaction, LoginResponse, PageResponse, SocialAssistanceRecord, SocialAssistanceSummary, Team, TeamDetail, Territory, UserSummary, UserTeamHistory, Visit } from './models';
+import { AppUser, AuditLog, ChildRecord, ChildrenSummary, Dashboard, DuplicateVisitGroup, FinanceSummary, FinancialTransaction, LoginResponse, PageResponse, SocialAssistanceRecord, SocialAssistanceSummary, Team, TeamDetail, Territory, TerritoryDistributionPlan, TerritoryDistributionRequest, UserSummary, UserTeamHistory, Visit } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -104,6 +104,22 @@ export class ApiService {
 
   deleteTerritory(id: number) {
     return this.http.delete<void>(`${environment.apiBaseUrl}/territories/${id}`);
+  }
+
+  territoryDistributionDraft() {
+    return this.http.get<TerritoryDistributionPlan | null>(`${environment.apiBaseUrl}/territories/distribution/draft`);
+  }
+
+  generateTerritoryDistribution(request: TerritoryDistributionRequest) {
+    return this.http.post<TerritoryDistributionPlan>(`${environment.apiBaseUrl}/territories/distribution/draft`, request);
+  }
+
+  discardTerritoryDistribution() {
+    return this.http.delete<void>(`${environment.apiBaseUrl}/territories/distribution/draft`);
+  }
+
+  publishTerritoryDistribution() {
+    return this.http.post<Territory[]>(`${environment.apiBaseUrl}/territories/distribution/publish`, {});
   }
 
   duplicateVisits() {

@@ -34,6 +34,15 @@ public class Territory extends PanacheEntityBase {
     @Column(name = "enforce_for_projectists", nullable = false)
     public boolean enforceForProjectists = false;
 
+    @Column(nullable = false)
+    public boolean generated = false;
+
+    @Column(name = "distribution_version", length = 80)
+    public String distributionVersion;
+
+    @Column(name = "published_at")
+    public OffsetDateTime publishedAt;
+
     @Column(name = "created_at", nullable = false)
     public OffsetDateTime createdAt = OffsetDateTime.now();
 

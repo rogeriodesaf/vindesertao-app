@@ -46,6 +46,17 @@ public class VisitService {
     @Transactional
     public HouseholdVisit create(VisitDtos.VisitRequest request) {
         AppUser user = currentUser.entity();
+        String clientReference = trimToNull(request.clientReference());
+        if (clientReference != null) {
+            HouseholdVisit existing = visits.find("clientReference = ?1 and responsibleUser.id = ?2", clientReference, user.id).firstResult();
+            if (existing != null) {
+                // The response is assembled after the transactional interceptor returns.
+                // Initialize the two lazy relations while the persistence context is open.
+                existing.responsibleUser.name.length();
+                if (existing.team != null) existing.team.name.length();
+                return existing;
+            }
+        }
         Team visitTeam = resolveVisitTeam(user);
         HouseholdVisit visit = new HouseholdVisit();
         apply(request, visit);
@@ -97,6 +108,9 @@ public class VisitService {
         if (currentUser.isLeader() && user.team != null && visit.team != null && user.team.id.equals(visit.team.id)) {
             return visit;
         }
+        if (!edit && currentUser.isLeader()) {
+            return visit;
+        }
         if (!edit && visit.team != null && visibleVisitTeamIds(user).contains(visit.team.id)) {
             return visit;
         }
@@ -115,7 +129,7 @@ public class VisitService {
         where.add("lower(coalesce(responsibleUser.roles, '')) not like :adminRole");
         params.and("adminRole", "%admin%");
 
-        if (!currentUser.isAdmin()) {
+        if (!currentUser.isAdmin() && !currentUser.isLeader()) {
             Set<Long> visibleTeamIds = visibleVisitTeamIds(user);
             if (!visibleTeamIds.isEmpty()) {
                 where.add("(team.id in :visibleTeamIds or responsibleUser.id = :currentUserId)");
@@ -174,6 +188,7 @@ public class VisitService {
         visit.nextVisitAt = request.nextVisitAt();
         visit.notes = request.notes();
         visit.streetViewUrl = trimToNull(request.streetViewUrl());
+        if (visit.clientReference == null) visit.clientReference = trimToNull(request.clientReference());
         applyPhoto(request, visit);
     }
 

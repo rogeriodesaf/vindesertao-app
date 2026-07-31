@@ -15,25 +15,29 @@ public class TerritoryResource {
     @Inject
     TerritoryService territoryService;
 
+    @Inject
+    TerritoryDistributionService distributionService;
+
     @GET
     @RolesAllowed({"admin", "lider", "projetista"})
     public List<TerritoryDtos.TerritoryResponse> list() {
-        return territoryService.listVisible().stream()
-                .map(TerritoryDtos.TerritoryResponse::from)
-                .toList();
+        return territoryService.listVisibleResponses();
     }
 
     @POST
     @RolesAllowed("admin")
     public TerritoryDtos.TerritoryResponse create(@Valid TerritoryDtos.TerritoryRequest request) {
-        return TerritoryDtos.TerritoryResponse.from(territoryService.create(request));
+        Long id = territoryService.create(request).id;
+        return territoryService.listVisibleResponses().stream()
+                .filter(item -> item.id().equals(id)).findFirst().orElseThrow();
     }
 
     @PUT
     @Path("/{id}")
     @RolesAllowed("admin")
     public TerritoryDtos.TerritoryResponse update(@PathParam("id") Long id, @Valid TerritoryDtos.TerritoryRequest request) {
-        return TerritoryDtos.TerritoryResponse.from(territoryService.update(id, request));
+        territoryService.update(id, request);
+        return territoryService.listVisibleResponses().stream().filter(item -> item.id().equals(id)).findFirst().orElseThrow();
     }
 
     @DELETE
@@ -41,5 +45,34 @@ public class TerritoryResource {
     @RolesAllowed("admin")
     public void delete(@PathParam("id") Long id) {
         territoryService.delete(id);
+    }
+
+    @GET
+    @Path("/distribution/draft")
+    @RolesAllowed("admin")
+    public TerritoryDtos.DistributionPlan draft() {
+        return distributionService.currentDraft();
+    }
+
+    @POST
+    @Path("/distribution/draft")
+    @RolesAllowed("admin")
+    public TerritoryDtos.DistributionPlan generateDraft(@Valid TerritoryDtos.DistributionRequest request) {
+        return distributionService.generateDraft(request);
+    }
+
+    @DELETE
+    @Path("/distribution/draft")
+    @RolesAllowed("admin")
+    public void discardDraft() {
+        distributionService.discardDraft();
+    }
+
+    @POST
+    @Path("/distribution/publish")
+    @RolesAllowed("admin")
+    public List<TerritoryDtos.TerritoryResponse> publish() {
+        distributionService.publishDraft();
+        return territoryService.listVisibleResponses();
     }
 }

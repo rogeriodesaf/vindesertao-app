@@ -6,14 +6,14 @@ import { FormsModule, NgForm } from '@angular/forms';
 import * as L from 'leaflet';
 import { FileSource, PMTiles } from 'pmtiles';
 import { leafletLayer } from 'protomaps-leaflet';
-import { finalize } from 'rxjs';
+import { finalize, firstValueFrom } from 'rxjs';
 import { ApiService } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { formatDateTime } from '../core/date-format';
 import { missionCityMap, missionCityMaps, MissionCityMapProfile } from '../core/mission-city.config';
-import { Territory, Visit } from '../core/models';
+import { Team, Territory, Visit } from '../core/models';
 import { NotificationService } from '../core/notification.service';
-import { OfflineMapCacheService } from '../core/offline-map-cache.service';
+import { OfflineMapCacheService, OfflinePackageMetadata } from '../core/offline-map-cache.service';
 import { normalizeOfflineVisit, OfflineVisitQueueService } from '../core/offline-visit-queue.service';
 import { EmptyStateComponent } from '../shared/empty-state.component';
 import { ListCardAction, ListCardComponent, ListCardInfo } from '../shared/list-card.component';
@@ -57,6 +57,18 @@ interface VisitFormDraft {
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v3m0 14v3M2 12h3m14 0h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"></path></svg>
           </button>
           @if (mapLocationMessage()) { <div class="map-location-message">{{ mapLocationMessage() }}</div> }
+          @if (territories().length) {
+            <details class="visit-territory-legend">
+              <summary>Territórios</summary>
+              @for (territory of territories(); track territory.id) {
+                <div>
+                  <span [style.background]="territory.color"></span>
+                  <strong>{{ territory.teamName || territory.name }}</strong>
+                  <small>{{ territory.houseCount || 0 }} casas</small>
+                </div>
+              }
+            </details>
+          }
           @if (territoryStatus() && !territoryNoticeDismissed()) {
             <div class="territory-status" [class.outside]="territoryOutside()" role="status">
               <span>
@@ -86,6 +98,16 @@ interface VisitFormDraft {
                   {{ pendingOpen() ? 'Ocultar pendências' : 'Ver pendências' }}
                 </button>
               </div>
+            }
+            <div class="offline-actions">
+              <button type="button" class="secondary" [disabled]="offlinePackageBusy() || !online()" (click)="prepareFieldOffline()">
+                {{ offlinePackageBusy() ? 'Preparando...' : 'Preparar mapa offline' }}
+              </button>
+            </div>
+            @if (offlinePackageMetadata(); as metadata) {
+              <small>Mapa preparado em {{ formatDate(metadata.updatedAt) }} · {{ metadata.visitCount }} casas</small>
+            } @else {
+              <small class="error">Este aparelho ainda nao foi preparado para o trabalho sem internet.</small>
             }
           </section>
           @if (pendingOpen() && offlineQueue.pendingItems().length) {
@@ -306,6 +328,8 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   saving = signal(false);
   loadingVisits = signal(false);
   loadingTerritories = signal(false);
+  offlinePackageBusy = signal(false);
+  offlinePackageMetadata = signal<OfflinePackageMetadata | null>(null);
   searchingAddress = signal(false);
   exporting = signal(false);
   deletingId = signal<number | null>(null);
@@ -348,6 +372,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   private mobileFormDraft: VisitFormDraft | null = null;
   private reloadVisitsAfterCurrentRequest = false;
   private mapGeneration = 0;
+  private gpsOutsideNoticeShown = false;
 
   constructor(
     public api: ApiService,
@@ -393,6 +418,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     window.addEventListener('resize', this.handleResize);
     window.addEventListener('orientationchange', this.handleResize);
     this.offlineQueue.refreshCount().then(() => this.renderMarkers(this.visits()));
+    this.offlineMapCache.loadPackageMetadata().then(metadata => this.offlinePackageMetadata.set(metadata));
   }
 
   private initializeMap(): void {
@@ -426,7 +452,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private async addOfflineCityLayer(city: MissionCityMapProfile, map: L.Map, generation: number): Promise<void> {
     try {
-      const response = await fetch(city.mapArchiveUrl);
+      const response = await this.offlineMapCache.mapArchive(city.mapArchiveUrl);
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -532,6 +558,33 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       error: () => this.loadCachedTerritories(true)
     });
+  }
+
+  async prepareFieldOffline(): Promise<void> {
+    if (this.offlinePackageBusy() || !this.online()) return;
+    this.offlinePackageBusy.set(true);
+    try {
+      const [page, territories] = await Promise.all([
+        firstValueFrom(this.api.visits({ page: 0, size: 10000 })),
+        firstValueFrom(this.api.territories())
+      ]);
+      const teams: Team[] = [...new Map(territories.map(territory => [territory.teamId, {
+        id: territory.teamId,
+        name: territory.teamName || territory.name,
+        teamType: 'EVANGELISM' as const,
+        canRegisterVisits: true
+      }])).values()];
+      const metadata = await this.offlineMapCache.prepareOfflinePackage(
+        missionCityMaps.map(city => ({ id: city.id, url: city.mapArchiveUrl, version: city.mapDataVersion })),
+        territories, page.items, teams, []
+      );
+      this.offlinePackageMetadata.set(metadata);
+      this.notifications.success(`Mapa offline pronto com ${page.items.length} casas e ${territories.length} territorios.`);
+    } catch {
+      this.notifications.error('Nao foi possivel preparar o mapa offline. Verifique a conexao e o espaco livre.');
+    } finally {
+      this.offlinePackageBusy.set(false);
+    }
   }
 
   private loadCachedVisits(requestFailed = false): void {
@@ -903,7 +956,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
           this.userLocationMarker.addTo(this.map as L.Map);
         }
         this.locatingMap.set(false);
-        this.mapLocationMessage.set('Você está aqui');
+        this.updateGpsTerritoryStatus(point);
         this.map?.invalidateSize();
         if (centerMap) this.map?.setView(point, 16);
         else this.refreshMapView();
@@ -1378,7 +1431,8 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     this.territories().forEach((territory) => {
       const points = this.pointsFromGeoJson(territory.polygonGeoJson);
       if (points.length >= 3) {
-        const selected = this.pointInsideTerritory(territory);
+        const selected = this.pointInsideTerritory(territory)
+          || !this.isPrivilegedMapViewer();
         const polygon = L.polygon(points, {
           color: territory.color,
           fillColor: territory.color,
@@ -1405,6 +1459,10 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
         && !!this.findMissionCityByPoint([Number(visit.latitude), Number(visit.longitude)])
         && (!currentCity || this.findMissionCityByPoint([Number(visit.latitude), Number(visit.longitude)])?.id === currentCity.id))
       .map(visit => [Number(visit.latitude), Number(visit.longitude)]);
+    if (!this.isPrivilegedMapViewer() && !this.userCoordinates) {
+      this.territories().forEach(territory => this.pointsFromGeoJson(territory.polygonGeoJson)
+        .forEach(point => points.push([point.lat, point.lng])));
+    }
     if (this.userCoordinates && this.findMissionCityByPoint(this.userCoordinates)) {
       points.push(this.userCoordinates);
     }
@@ -1727,6 +1785,10 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     const latitude = this.form.latitude as number;
     const longitude = this.form.longitude as number;
+    return this.pointInsideCoordinates(territory, latitude, longitude);
+  }
+
+  private pointInsideCoordinates(territory: Territory, latitude: number, longitude: number): boolean {
     const points = this.pointsFromGeoJson(territory.polygonGeoJson);
     let inside = false;
     for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
@@ -1739,6 +1801,33 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
       if (intersects) inside = !inside;
     }
     return inside;
+  }
+
+  private updateGpsTerritoryStatus(point: L.LatLngTuple): void {
+    if (!this.territories().length) {
+      this.gpsOutsideNoticeShown = false;
+      this.mapLocationMessage.set('Você está aqui. Nenhum território foi publicado para sua equipe.');
+      return;
+    }
+    const territory = this.territories().find(item => this.pointInsideCoordinates(item, point[0], point[1]));
+    if (territory) {
+      this.gpsOutsideNoticeShown = false;
+      this.mapLocationMessage.set(`Você está no território da ${territory.teamName || territory.name}.`);
+      return;
+    }
+    const teamNames = [...new Set(this.territories().map(item => item.teamName).filter(Boolean))];
+    const label = teamNames.length === 1 ? teamNames[0] : 'sua equipe';
+    const message = `Você está fora do território da ${label}.`;
+    this.mapLocationMessage.set(message);
+    if (!this.gpsOutsideNoticeShown) {
+      this.gpsOutsideNoticeShown = true;
+      this.notifications.warning(message);
+    }
+  }
+
+  private isPrivilegedMapViewer(): boolean {
+    const roles = this.auth.user()?.roles || [];
+    return roles.includes('admin') || roles.includes('lider');
   }
 
   private cssColor(variable: string): string {

@@ -14,6 +14,7 @@ public record LoginResponse(
             String email,
             Set<String> roles,
             Long teamId,
+            Set<Long> visitTeamIds,
             boolean mustChangePassword,
             boolean canRegisterVisits,
             boolean canViewReports,

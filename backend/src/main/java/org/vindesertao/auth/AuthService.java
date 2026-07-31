@@ -7,15 +7,25 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.mindrot.jbcrypt.BCrypt;
 import org.vindesertao.user.AppUser;
 import org.vindesertao.user.UserRepository;
+import org.vindesertao.user.UserTeamMembershipRepository;
+import org.vindesertao.team.TeamRepository;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Optional;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @ApplicationScoped
 public class AuthService {
     @Inject
     UserRepository users;
+
+    @Inject
+    UserTeamMembershipRepository memberships;
+
+    @Inject
+    TeamRepository teams;
 
     @ConfigProperty(name = "mp.jwt.verify.issuer")
     String issuer;
@@ -73,8 +83,16 @@ public class AuthService {
         String token = tokenBuilder
                 .expiresIn(tokenTtl)
                 .sign();
+        Set<Long> visitTeamIds = new LinkedHashSet<>();
+        if (user.hasRole("admin") || user.hasRole("lider")) {
+            teams.find("canRegisterVisits = true order by name").list().forEach(team -> visitTeamIds.add(team.id));
+        } else {
+            if (user.team != null && user.team.canRegisterVisits) visitTeamIds.add(user.team.id);
+            memberships.find("user.id = ?1 and team.canRegisterVisits = true order by team.name", user.id).list()
+                    .forEach(membership -> visitTeamIds.add(membership.team.id));
+        }
         return new LoginResponse(token, "Bearer", expiresIn,
                 new LoginResponse.UserPrincipal(user.id, user.name, user.email, user.roleSet(), user.team == null ? null : user.team.id,
-                        user.mustChangePassword, user.canRegisterVisits, user.canViewReports, user.canAccessFinance, user.canAccessChildren));
+                        visitTeamIds, user.mustChangePassword, user.canRegisterVisits, user.canViewReports, user.canAccessFinance, user.canAccessChildren));
     }
 }

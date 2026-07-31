@@ -2,9 +2,14 @@ import { AfterViewInit, Component, HostListener, OnDestroy, OnInit, signal } fro
 import { HttpClient } from '@angular/common/http';
 import { FormsModule, NgForm } from '@angular/forms';
 import * as L from 'leaflet';
+import { FileSource, PMTiles } from 'pmtiles';
+import { leafletLayer } from 'protomaps-leaflet';
+import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../core/api.service';
-import { Team, Territory } from '../core/models';
+import { Team, Territory, TerritoryDistributionHouse, TerritoryDistributionPlan } from '../core/models';
 import { NotificationService } from '../core/notification.service';
+import { OfflineMapCacheService, OfflinePackageMetadata } from '../core/offline-map-cache.service';
+import { missionCityMap, missionCityMaps, MissionCityMapProfile } from '../core/mission-city.config';
 import { EmptyStateComponent } from '../shared/empty-state.component';
 import { ListCardComponent } from '../shared/list-card.component';
 
@@ -19,13 +24,85 @@ type MapMode = 'select' | 'polygon' | 'rectangle' | 'edit';
       <div class="page-head">
         <div>
           <h1>Territorios</h1>
-          <p class="muted">Desenhe poligonos no mapa e atribua cada area a uma equipe.</p>
+          <p class="muted">Distribua as casas entre equipes ou ajuste manualmente uma area.</p>
         </div>
       </div>
 
       <div class="territory-layout">
-        <form #territoryForm="ngForm" class="editor" novalidate (ngSubmit)="save(territoryForm)">
-          <h2>{{ form.id ? 'Editar territorio' : 'Novo territorio' }}</h2>
+        <aside class="editor territory-admin-panel">
+          <section class="territory-auto" aria-labelledby="automatic-distribution-title">
+            <div class="territory-section-head">
+              <div>
+                <h2 id="automatic-distribution-title">Divisao automatica</h2>
+                <p class="muted">Equilibra casas e preserva ruas sempre que possivel.</p>
+              </div>
+            </div>
+            <label>Quantidade de equipes
+              <input type="number" min="1" [max]="visitTeams().length" [(ngModel)]="teamCount" (change)="selectFirstTeams()">
+            </label>
+            <div class="territory-team-picker" role="group" aria-label="Equipes da distribuicao">
+              @for (team of visitTeams(); track team.id) {
+                <label class="check-row">
+                  <input type="checkbox" [checked]="isTeamSelected(team.id!)" (change)="toggleTeam(team.id!)">
+                  {{ team.name }}
+                </label>
+              }
+            </div>
+            <div class="actions territory-distribution-actions">
+              <button type="button" [disabled]="distributionBusy() || !selectedTeamIds.length" (click)="generateDistribution()">
+                {{ distribution() ? 'Refazer divisao' : 'Gerar divisao' }}
+              </button>
+              @if (distribution()) {
+                <button type="button" class="secondary" [disabled]="distributionBusy()" (click)="discardDistribution()">Desfazer rascunho</button>
+              }
+            </div>
+
+            @if (distributionBusy()) { <p class="muted" role="status">Calculando territorios...</p> }
+            @if (distribution(); as plan) {
+              <div class="territory-plan-summary">
+                <strong>{{ plan.totalHouses }} casas em {{ plan.areas.length }} equipes</strong>
+                <span>{{ plan.minimumHouses }} a {{ plan.maximumHouses }} casas por equipe</span>
+                <span>{{ plan.locatedHouses }} com coordenadas · {{ plan.unlocatedHouses }} sem coordenadas</span>
+                @if (plan.imbalanced) { <span class="territory-balance-warning">Atencao: a divisao ficou desbalanceada. Revise as ruas antes de publicar.</span> }
+              </div>
+              <div class="territory-legend" aria-label="Legenda dos territorios">
+                @for (area of plan.areas; track area.teamId) {
+                  <details class="territory-legend-item">
+                    <summary>
+                      <span class="territory-swatch" [style.background]="area.color"></span>
+                      <strong>{{ area.teamName }}</strong>
+                      <span>{{ area.houseCount }} casas · {{ coverageLabel(area.coverageStatus) }}</span>
+                    </summary>
+                    <div class="territory-house-list">
+                      @for (house of area.houses; track house.visitId) {
+                        <div class="territory-house-row">
+                          <div>
+                            <strong>{{ house.personName }}</strong>
+                            <small>{{ house.street || 'Rua nao informada' }}{{ house.number ? ', ' + house.number : '' }} · {{ house.neighborhood || 'Bairro nao informado' }}</small>
+                          </div>
+                          <select #moveTarget [value]="area.teamId" [attr.aria-label]="'Equipe de destino de ' + house.personName">
+                            @for (target of plan.areas; track target.teamId) { <option [value]="target.teamId">{{ target.teamName }}</option> }
+                          </select>
+                          <div class="territory-move-actions">
+                            <button type="button" class="secondary" (click)="moveHouse(house, +moveTarget.value)">Ponto</button>
+                            <button type="button" class="secondary" [disabled]="!house.street" (click)="moveStreet(house, +moveTarget.value)">Rua</button>
+                            <button type="button" class="secondary" [disabled]="!house.neighborhood" (click)="moveNeighborhood(house, +moveTarget.value)">Bairro</button>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </details>
+                }
+              </div>
+              <button type="button" class="territory-publish" [disabled]="distributionBusy()" (click)="publishDistribution()">Publicar territorios</button>
+              <p class="muted">O mapa publicado so muda depois desta confirmacao.</p>
+            }
+          </section>
+
+          <details class="territory-manual-details">
+            <summary>Demarcacao manual</summary>
+          <form #territoryForm="ngForm" class="territory-manual-form" novalidate (ngSubmit)="save(territoryForm)">
+          <h2>{{ form.id ? 'Editar territorio' : 'Novo territorio manual' }}</h2>
           <label>Nome<input name="name" [(ngModel)]="form.name" required></label>
           <label>Equipe
             <select name="teamId" [(ngModel)]="form.teamId" required>
@@ -45,7 +122,23 @@ type MapMode = 'select' | 'polygon' | 'rectangle' | 'edit';
           @if (message()) { <p class="success">{{ message() }}</p> }
           @if (error()) { <p class="error">{{ error() }}</p> }
           <button type="submit">Salvar territorio</button>
-        </form>
+          </form>
+          </details>
+
+          <section class="territory-offline-card" aria-labelledby="offline-package-title">
+            <h2 id="offline-package-title">Mapa para uso offline</h2>
+            <p class="muted">Baixa mapas regionais, territorios, casas e equipes neste aparelho.</p>
+            @if (offlineEstimate() !== null) { <p>Tamanho estimado dos mapas: <strong>{{ formatBytes(offlineEstimate()!) }}</strong></p> }
+            @if (offlineMetadata(); as metadata) {
+              <p class="success">Disponivel offline · atualizado em {{ formatDate(metadata.updatedAt) }} · {{ formatBytes(metadata.sizeBytes) }}</p>
+            } @else {
+              <p class="territory-balance-warning">Prepare o aparelho antes de sair de uma area com internet.</p>
+            }
+            <button type="button" [disabled]="offlineBusy()" (click)="prepareOfflinePackage()">
+              {{ offlineBusy() ? 'Preparando mapa...' : 'Disponibilizar mapa offline' }}
+            </button>
+          </section>
+        </aside>
 
         <div class="territory-map-panel" [class.is-drawing]="isDrawing()">
           <div class="map-toolbar territory-search">
@@ -79,7 +172,7 @@ type MapMode = 'select' | 'polygon' | 'rectangle' | 'edit';
             @for (territory of territories(); track territory.id) {
               <app-list-card [title]="territory.name" [color]="territory.color" [state]="territory.active ? 'Ativo' : 'Inativo'"
                 [selected]="form.id === territory.id" [interactive]="true" [actions]="[{ id: 'edit', label: 'Editar', icon: 'edit' }]"
-                [infos]="[{ icon: 'groups', text: territory.teamName }, { icon: 'status', text: territory.enforceForProjectists ? 'Regra ativa' : 'Sem bloqueio' }]"
+                [infos]="[{ icon: 'groups', text: territory.teamName }, { icon: 'home', text: (territory.houseCount || 0) + ' casas' }, { icon: 'status', text: territory.generated ? 'Distribuicao publicada' : (territory.enforceForProjectists ? 'Regra ativa' : 'Sem bloqueio') }]"
                 (activate)="edit(territory)" (action)="edit(territory)" />
             } @empty { <app-empty-state message="Nenhum territorio cadastrado." /> }
           </div>
@@ -97,7 +190,15 @@ export class TerritoriesComponent implements OnInit, AfterViewInit, OnDestroy {
   instruction = signal('Selecione um modo para demarcar o territorio.');
   areaLabel = signal('');
   canUndo = signal(false);
+  distribution = signal<TerritoryDistributionPlan | null>(null);
+  distributionBusy = signal(false);
+  offlineBusy = signal(false);
+  offlineMetadata = signal<OfflinePackageMetadata | null>(null);
+  offlineEstimate = signal<number | null>(null);
   searchText = '';
+  teamCount = 1;
+  selectedTeamIds: number[] = [];
+  private assignmentOverrides: Record<number, number> = {};
   form: Territory = this.blank();
   drawnPoints: L.LatLng[] = [];
   private map?: L.Map;
@@ -107,27 +208,53 @@ export class TerritoriesComponent implements OnInit, AfterViewInit, OnDestroy {
   private modeStartPoints: L.LatLng[] = [];
   private dirty = false;
 
-  constructor(private api: ApiService, private http: HttpClient, private notifications: NotificationService) {}
+  constructor(
+    private api: ApiService,
+    private http: HttpClient,
+    private notifications: NotificationService,
+    private offlineMapCache: OfflineMapCacheService
+  ) {}
 
   ngOnInit(): void {
     this.api.teams().subscribe((teams) => {
       this.teams.set(teams);
       if (!this.form.teamId) this.form.teamId = this.visitTeams()[0]?.id ?? 0;
+      if (!this.selectedTeamIds.length) {
+        this.teamCount = Math.max(1, Math.min(15, this.visitTeams().length));
+        this.selectFirstTeams();
+      }
+      this.estimateOfflineSize();
     });
     this.load();
+    this.loadDistributionDraft();
+    this.offlineMapCache.loadPackageMetadata().then(metadata => this.offlineMetadata.set(metadata));
   }
 
   ngAfterViewInit(): void {
-    this.map = L.map('territory-map', { zoomControl: false, doubleClickZoom: false }).setView([-7.229, -39.313], 13);
+    const allBounds = L.latLngBounds(missionCityMaps.flatMap(city => [city.bounds[0], city.bounds[1]]));
+    this.map = L.map('territory-map', {
+      zoomControl: false,
+      doubleClickZoom: false,
+      minZoom: missionCityMap.minZoom,
+      maxZoom: missionCityMap.maxZoom,
+      maxBounds: allBounds,
+      maxBoundsViscosity: 0.9
+    }).setView(missionCityMap.center, missionCityMap.initialZoom);
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(this.map);
+    missionCityMaps.forEach(city => this.addOfflineCityLayer(city));
     this.drawingLayer.addTo(this.map);
     this.territoryLayer.addTo(this.map);
     this.map.on('click', (event: L.LeafletMouseEvent) => this.handleMapClick(event.latlng));
     this.renderTerritories();
   }
 
-  ngOnDestroy(): void { this.map?.remove(); }
+  ngOnDestroy(): void {
+    this.drawingLayer.clearLayers();
+    this.territoryLayer.clearLayers();
+    this.map?.off();
+    this.map?.remove();
+    this.map = undefined;
+  }
 
   @HostListener('window:beforeunload', ['$event'])
   warnUnsaved(event: BeforeUnloadEvent): void {
@@ -139,6 +266,140 @@ export class TerritoriesComponent implements OnInit, AfterViewInit, OnDestroy {
       this.territories.set(territories);
       this.renderTerritories();
     });
+  }
+
+  loadDistributionDraft(): void {
+    this.api.territoryDistributionDraft().subscribe({
+      next: plan => {
+        if (plan) this.applyDistribution(plan);
+        else this.offlineMapCache.loadDistributionDraft().then(cached => {
+          if (cached) this.applyDistribution(cached, false);
+        });
+      },
+      error: () => this.offlineMapCache.loadDistributionDraft().then(cached => {
+        if (cached) {
+          this.applyDistribution(cached, false);
+          this.notifications.info('Exibindo o rascunho de territorios salvo neste aparelho.');
+        }
+      })
+    });
+  }
+
+  selectFirstTeams(): void {
+    const available = this.visitTeams();
+    this.teamCount = Math.max(1, Math.min(Number(this.teamCount) || 1, available.length || 1));
+    this.selectedTeamIds = available.slice(0, this.teamCount).map(team => team.id!).filter(Boolean);
+  }
+
+  isTeamSelected(teamId: number): boolean {
+    return this.selectedTeamIds.includes(teamId);
+  }
+
+  toggleTeam(teamId: number): void {
+    this.selectedTeamIds = this.isTeamSelected(teamId)
+      ? this.selectedTeamIds.filter(id => id !== teamId)
+      : [...this.selectedTeamIds, teamId];
+    this.teamCount = this.selectedTeamIds.length;
+  }
+
+  generateDistribution(): void {
+    this.assignmentOverrides = {};
+    this.requestDistribution();
+  }
+
+  moveHouse(house: TerritoryDistributionHouse, targetTeamId: number | string): void {
+    this.preserveCurrentAssignments();
+    this.assignmentOverrides[house.visitId] = Number(targetTeamId);
+    this.requestDistribution();
+  }
+
+  moveStreet(house: TerritoryDistributionHouse, targetTeamId: number | string): void {
+    if (!house.street) return;
+    this.moveMatching(targetTeamId, item => this.normalized(item.street) === this.normalized(house.street)
+      && this.normalized(item.neighborhood) === this.normalized(house.neighborhood));
+  }
+
+  moveNeighborhood(house: TerritoryDistributionHouse, targetTeamId: number | string): void {
+    if (!house.neighborhood) return;
+    this.moveMatching(targetTeamId, item => this.normalized(item.neighborhood) === this.normalized(house.neighborhood));
+  }
+
+  discardDistribution(): void {
+    if (!confirm('Descartar o rascunho? Os territorios publicados continuarao inalterados.')) return;
+    this.distributionBusy.set(true);
+    this.api.discardTerritoryDistribution().subscribe({
+      next: () => {
+        this.distribution.set(null);
+        this.assignmentOverrides = {};
+        this.offlineMapCache.saveDistributionDraft(null);
+        this.renderTerritories();
+        this.distributionBusy.set(false);
+        this.ok('Rascunho descartado. O mapa publicado nao foi alterado.');
+      },
+      error: () => {
+        this.distributionBusy.set(false);
+        this.fail('Nao foi possivel descartar o rascunho.');
+      }
+    });
+  }
+
+  publishDistribution(): void {
+    const plan = this.distribution();
+    if (!plan || !confirm(`Publicar a divisao de ${plan.totalHouses} casas entre ${plan.areas.length} equipes?`)) return;
+    this.distributionBusy.set(true);
+    this.api.publishTerritoryDistribution().subscribe({
+      next: territories => {
+        this.territories.set(territories);
+        this.distribution.set(null);
+        this.assignmentOverrides = {};
+        this.offlineMapCache.saveDistributionDraft(null);
+        this.offlineMapCache.saveTerritories(territories);
+        this.renderTerritories();
+        this.distributionBusy.set(false);
+        this.ok('Territorios publicados e casas atribuidas com sucesso.');
+      },
+      error: error => {
+        this.distributionBusy.set(false);
+        this.fail(error?.error?.message || error?.error?.details || 'Nao foi possivel publicar. Refaca a distribuicao e tente novamente.');
+      }
+    });
+  }
+
+  coverageLabel(value: string): string {
+    if (value === 'COMPLETA') return 'cobertura completa';
+    if (value === 'SEM_COORDENADAS') return 'sem coordenadas';
+    return 'cobertura parcial';
+  }
+
+  async prepareOfflinePackage(): Promise<void> {
+    if (this.offlineBusy()) return;
+    this.offlineBusy.set(true);
+    try {
+      const [page, territories, users] = await Promise.all([
+        firstValueFrom(this.api.visits({ page: 0, size: 10000 })),
+        firstValueFrom(this.api.territories()),
+        firstValueFrom(this.api.users({ page: 0, size: 10000 }))
+      ]);
+      const metadata = await this.offlineMapCache.prepareOfflinePackage(
+        this.mapArchives(), territories, page.items, this.teams(), users.items
+      );
+      if (this.distribution()) await this.offlineMapCache.saveDistributionDraft(this.distribution());
+      this.offlineMetadata.set(metadata);
+      this.ok(`Mapa offline preparado: ${territories.length} territorios, ${page.items.length} casas e ${metadata.cachedPhotoCount}/${metadata.photoCount} fotos.`);
+    } catch {
+      this.fail('Nao foi possivel preparar todo o mapa offline. Verifique a conexao e o espaco livre do aparelho.');
+    } finally {
+      this.offlineBusy.set(false);
+    }
+  }
+
+  formatBytes(value: number): string {
+    if (value < 1024 * 1024) return `${Math.max(1, Math.round(value / 1024))} KB`;
+    return `${(value / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
+  }
+
+  formatDate(value: string): string {
+    return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
   }
 
   save(form: NgForm): void {
@@ -234,6 +495,7 @@ export class TerritoriesComponent implements OnInit, AfterViewInit, OnDestroy {
 
   searchAddress(): void {
     if (!this.searchText.trim()) return;
+    if (!navigator.onLine) return this.fail('A busca de endereco exige internet. O mapa baixado continua disponivel para navegacao offline.');
     this.http.get<Array<{ lat: string; lon: string }>>('https://nominatim.openstreetmap.org/search', {
       params: { q: this.searchText, format: 'json', limit: 1, addressdetails: 1 }
     }).subscribe((results) => {
@@ -377,6 +639,18 @@ export class TerritoriesComponent implements OnInit, AfterViewInit, OnDestroy {
         .on('click', (event) => { L.DomEvent.stopPropagation(event); this.edit(territory); })
         .addTo(this.territoryLayer);
     });
+    this.distribution()?.areas.forEach(area => {
+      const points = this.pointsFromGeoJson(area.polygonGeoJson);
+      if (points.length < 3) return;
+      allBounds.push(...points);
+      L.polygon(points, {
+        color: area.color,
+        fillColor: area.color,
+        fillOpacity: 0.2,
+        weight: 3,
+        dashArray: '8 6'
+      }).bindTooltip(`Rascunho: ${area.teamName} · ${area.houseCount} casas`).addTo(this.territoryLayer);
+    });
     if (allBounds.length && !this.form.id) this.map.fitBounds(L.latLngBounds(allBounds), { padding: [30, 30], maxZoom: 15 });
   }
 
@@ -438,4 +712,81 @@ export class TerritoriesComponent implements OnInit, AfterViewInit, OnDestroy {
   visitTeams(): Team[] { return this.teams().filter((team) => team.canRegisterVisits); }
   private ok(message: string): void { this.message.set(message); this.notifications.success(message); }
   private fail(message: string): void { this.error.set(message); this.notifications.error(message); }
+
+  private requestDistribution(): void {
+    if (!this.selectedTeamIds.length) return this.fail('Selecione ao menos uma equipe de evangelismo.');
+    this.distributionBusy.set(true);
+    this.api.generateTerritoryDistribution({ teamIds: this.selectedTeamIds, visitAssignments: this.assignmentOverrides }).subscribe({
+      next: plan => {
+        this.applyDistribution(plan);
+        this.distributionBusy.set(false);
+        this.ok('Rascunho salvo. Revise a legenda e publique somente quando estiver pronto.');
+      },
+      error: error => {
+        this.distributionBusy.set(false);
+        this.fail(error?.error?.message || error?.error?.details || 'Nao foi possivel gerar a divisao. Confira equipes e casas com localizacao.');
+      }
+    });
+  }
+
+  private applyDistribution(plan: TerritoryDistributionPlan, saveOffline = true): void {
+    this.distribution.set(plan);
+    this.selectedTeamIds = plan.areas.map(area => area.teamId);
+    this.teamCount = this.selectedTeamIds.length;
+    this.assignmentOverrides = {};
+    if (saveOffline) this.offlineMapCache.saveDistributionDraft(plan);
+    this.renderTerritories();
+  }
+
+  private preserveCurrentAssignments(): void {
+    this.distribution()?.areas.forEach(area => area.houses.forEach(house => {
+      this.assignmentOverrides[house.visitId] = area.teamId;
+    }));
+  }
+
+  private moveMatching(targetTeamId: number | string, predicate: (house: TerritoryDistributionHouse) => boolean): void {
+    this.preserveCurrentAssignments();
+    this.distribution()?.areas.flatMap(area => area.houses).filter(predicate)
+      .forEach(house => this.assignmentOverrides[house.visitId] = Number(targetTeamId));
+    this.requestDistribution();
+  }
+
+  private normalized(value?: string): string {
+    return (value || '').trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+  }
+
+  private mapArchives() {
+    return missionCityMaps.map(city => ({ id: city.id, url: city.mapArchiveUrl, version: city.mapDataVersion }));
+  }
+
+  private estimateOfflineSize(): void {
+    this.offlineMapCache.estimateArchiveBytes(this.mapArchives()).then(size => this.offlineEstimate.set(size));
+  }
+
+  private async addOfflineCityLayer(city: MissionCityMapProfile): Promise<void> {
+    const map = this.map;
+    if (!map) return;
+    try {
+      const response = await this.offlineMapCache.mapArchive(city.mapArchiveUrl);
+      if (!response.ok || this.map !== map) throw new Error(`HTTP ${response.status}`);
+      const archive = new File([await response.blob()], `${city.id}-${city.mapDataVersion}.pmtiles`, {
+        type: 'application/vnd.pmtiles'
+      });
+      const layer = leafletLayer({
+        url: new PMTiles(new FileSource(archive)),
+        flavor: 'light',
+        lang: 'pt',
+        bounds: city.bounds,
+        minZoom: city.minZoom,
+        maxZoom: city.maxZoom,
+        maxDataZoom: city.maxDataZoom,
+        noWrap: true,
+        attribution: '&copy; OpenStreetMap | Protomaps'
+      });
+      if (this.map === map) layer['addTo'](map);
+    } catch {
+      if (!this.map) return;
+      this.notifications.warning(`O mapa offline de ${city.name} nao pode ser carregado neste aparelho.`);
+    }
+  }
 }

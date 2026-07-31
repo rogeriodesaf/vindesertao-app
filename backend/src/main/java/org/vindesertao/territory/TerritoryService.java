@@ -12,12 +12,15 @@ import org.vindesertao.team.Team;
 import org.vindesertao.team.TeamRepository;
 import org.vindesertao.user.AppUser;
 import org.vindesertao.user.UserTeamMembershipRepository;
+import org.vindesertao.visit.VisitRepository;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
 
 @ApplicationScoped
 public class TerritoryService {
@@ -39,8 +42,11 @@ public class TerritoryService {
     @Inject
     UserTeamMembershipRepository memberships;
 
+    @Inject
+    VisitRepository visits;
+
     public List<Territory> listVisible() {
-        if (currentUser.isAdmin()) {
+        if (currentUser.isAdmin() || currentUser.isLeader()) {
             return list();
         }
         Set<Long> teamIds = visibleVisitTeamIds(currentUser.entity());
@@ -48,6 +54,21 @@ public class TerritoryService {
             return List.of();
         }
         return territories.find("active = true and team.id in ?1 order by name", teamIds).list();
+    }
+
+    public List<TerritoryDtos.TerritoryResponse> listVisibleResponses() {
+        List<Territory> visible = listVisible();
+        Set<Long> teamIds = visible.stream().map(item -> item.team.id).collect(java.util.stream.Collectors.toSet());
+        Map<Long, long[]> counts = new HashMap<>();
+        if (!teamIds.isEmpty()) {
+            visits.countsByTeam(teamIds).forEach(row -> counts.put((Long) row[0], new long[]{
+                    ((Number) row[1]).longValue(), ((Number) row[2]).longValue()
+            }));
+        }
+        return visible.stream().map(territory -> {
+            long[] value = counts.getOrDefault(territory.team.id, new long[2]);
+            return TerritoryDtos.TerritoryResponse.from(territory, value[0], value[1]);
+        }).toList();
     }
 
     private List<Territory> list() {
@@ -126,6 +147,9 @@ public class TerritoryService {
         }
         territory.active = request.active();
         territory.enforceForProjectists = request.enforceForProjectists();
+        territory.generated = false;
+        territory.distributionVersion = null;
+        territory.publishedAt = null;
     }
 
     private List<double[]> points(String geoJson) {

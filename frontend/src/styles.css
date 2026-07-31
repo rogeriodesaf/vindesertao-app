@@ -527,6 +527,75 @@ h2 { font-size: 17px; }
   pointer-events: none;
 }
 .territory-area { margin: 0; color: var(--muted); }
+.territory-admin-panel { gap: 16px; }
+.territory-auto,
+.territory-offline-card,
+.territory-manual-details { display: grid; gap: 10px; }
+.territory-section-head h2,
+.territory-offline-card h2 { margin: 0; }
+.territory-manual-details > summary,
+.territory-legend-item > summary { cursor: pointer; font-weight: 800; }
+.territory-manual-form { display: grid; gap: 12px; padding-top: 12px; }
+.territory-team-picker {
+  max-height: 160px;
+  display: grid;
+  gap: 6px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--color-surface-soft);
+}
+.territory-distribution-actions { align-items: stretch; }
+.territory-distribution-actions button { flex: 1 1 120px; }
+.territory-plan-summary {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--color-surface-soft);
+  color: var(--text);
+  font-size: 13px;
+}
+.territory-plan-summary span { color: var(--muted); }
+.territory-balance-warning { color: var(--color-warning-readable, var(--color-warning)); font-weight: 700; }
+.territory-legend { display: grid; gap: 7px; }
+.territory-legend-item {
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--color-surface-elevated);
+}
+.territory-legend-item > summary { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 3px 8px; align-items: center; }
+.territory-legend-item > summary > span:last-child { grid-column: 2; color: var(--muted); font-size: 12px; font-weight: 600; }
+.territory-swatch { width: 12px; height: 12px; border-radius: 4px; }
+.territory-house-list { max-height: 280px; display: grid; gap: 8px; overflow-y: auto; padding-top: 8px; }
+.territory-house-row { display: grid; gap: 6px; padding: 8px; border-top: 1px solid var(--line); }
+.territory-house-row > div:first-child { display: grid; gap: 2px; min-width: 0; }
+.territory-house-row small { color: var(--muted); overflow-wrap: anywhere; }
+.territory-move-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+.territory-move-actions button { min-height: 36px; padding: 6px 9px; font-size: 12px; }
+.territory-publish { width: 100%; }
+.territory-offline-card { padding-top: 14px; border-top: 1px solid var(--line); }
+.visit-territory-legend {
+  position: absolute;
+  z-index: 510;
+  top: 82px;
+  right: 16px;
+  width: min(260px, calc(100% - 32px));
+  max-height: min(42vh, 320px);
+  overflow-y: auto;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-surface-elevated) 94%, transparent);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.visit-territory-legend summary { cursor: pointer; font-weight: 800; }
+.visit-territory-legend > div { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto; gap: 7px; align-items: center; margin-top: 7px; font-size: 12px; }
+.visit-territory-legend > div > span { width: 11px; height: 11px; border-radius: 3px; }
+.visit-territory-legend small { color: var(--muted); }
 .territory-map-panel.is-drawing .leaflet-container { cursor: crosshair; touch-action: none; }
 .territory-vertex-icon { background: transparent; border: 0; }
 .territory-vertex-icon span {
@@ -591,6 +660,7 @@ h2 { font-size: 17px; }
 }
 .offline-card div { display: grid; gap: 2px; }
 .offline-card span { color: var(--muted); font-size: 13px; }
+.offline-card > small { grid-column: 1 / -1; overflow-wrap: anywhere; }
 .offline-card-warning {
   border-left-color: var(--accent);
   background: var(--color-warning-surface);
@@ -1841,6 +1911,10 @@ tbody tr:hover { background: var(--color-hover); }
   }
   .territory-draw-toolbar button { flex: 1 0 auto; min-width: 88px; padding: 10px 12px; }
   .territory-instruction { bottom: calc(72px + env(safe-area-inset-bottom)); font-size: 12px; }
+  .territory-admin-panel { max-width: 100%; }
+  .territory-team-picker { max-height: 220px; }
+  .territory-house-row select { width: 100%; }
+  .visit-territory-legend { top: 72px; right: 10px; width: min(230px, calc(100% - 20px)); max-height: 30vh; }
   .territory-search { left: 10px; right: 10px; top: 10px; }
   .page { padding: 14px; gap: 14px; }
   .page-head, .date-filters, .report-actions { align-items: stretch; flex-direction: column; }

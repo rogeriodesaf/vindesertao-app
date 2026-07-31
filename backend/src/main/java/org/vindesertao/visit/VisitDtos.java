@@ -27,7 +27,8 @@ public class VisitDtos {
             String photoUrl,
             String photoContentType,
             String photoFileName,
-            String streetViewUrl
+            String streetViewUrl,
+            String clientReference
     ) {
     }
 
@@ -55,6 +56,7 @@ public class VisitDtos {
             String photoContentType,
             String photoFileName,
             String streetViewUrl,
+            String clientReference,
             Long responsibleUserId,
             String responsibleUserName,
             Long teamId,
@@ -97,6 +99,7 @@ public class VisitDtos {
                     visit.photoContentType,
                     visit.photoFileName,
                     visit.streetViewUrl,
+                    visit.clientReference,
                     visit.responsibleUser == null ? null : visit.responsibleUser.id,
                     visit.responsibleUser == null ? null : visit.responsibleUser.name,
                     visit.team == null ? null : visit.team.id,

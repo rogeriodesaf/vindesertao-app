@@ -12,11 +12,13 @@ import org.vindesertao.user.AppUser;
 import org.vindesertao.visit.HouseholdVisit;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItem;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @QuarkusTest
 class VisitResourceTest {
@@ -24,6 +26,29 @@ class VisitResourceTest {
 
     @Inject
     EntityManager entityManager;
+
+    @Test
+    @TestSecurity(user = "lider@vindesertao.local", roles = "lider")
+    void offlineRetryWithSameClientReferenceDoesNotDuplicateVisit() {
+        String reference = UUID.randomUUID().toString();
+        String body = """
+                {
+                  "personName": "Visita offline idempotente",
+                  "city": "Rio Tinto",
+                  "wantsVisits": true,
+                  "clientReference": "%s"
+                }
+                """.formatted(reference);
+        Long firstId = given().contentType(ContentType.JSON).body(body)
+                .when().post("/visits").then().statusCode(200).extract().jsonPath().getLong("id");
+        try {
+            given().contentType(ContentType.JSON).body(body)
+                    .when().post("/visits").then().statusCode(200).body("id", equalTo(firstId.intValue()));
+            assertEquals(1L, HouseholdVisit.count("clientReference", reference));
+        } finally {
+            QuarkusTransaction.requiringNew().run(() -> HouseholdVisit.delete("clientReference", reference));
+        }
+    }
 
     @Test
     @TestSecurity(user = "admin@vindesertao.local", roles = "admin")
