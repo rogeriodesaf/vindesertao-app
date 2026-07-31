@@ -44,29 +44,31 @@ interface VisitFormDraft {
       <button type="button" [class.active]="mobileView() === 'map'" (click)="showMobileView('map')">Mapa</button>
     </div>
     <section class="workspace" [class.mobile-map-view]="mobileView() === 'map'">
-      <div class="map-panel">
-        <div class="map-toolbar">
-          <input placeholder="Buscar endereço" [(ngModel)]="searchText" (keyup.enter)="searchAddress()">
-          <button type="button" [disabled]="searchingAddress()" (click)="searchAddress()">{{ searchingAddress() ? 'Buscando...' : 'Buscar' }}</button>
-          <button type="button" class="secondary" [disabled]="exporting()" (click)="downloadExcel()">{{ exporting() ? 'Gerando...' : 'Excel' }}</button>
-        </div>
-        <div id="visit-map" class="map"></div>
-        <button type="button" class="map-location-button" [disabled]="locatingMap()"
-          aria-label="Centralizar na minha localização" title="Minha localização" (click)="locateUser(true)">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v3m0 14v3M2 12h3m14 0h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"></path></svg>
-        </button>
-        @if (mapLocationMessage()) { <div class="map-location-message">{{ mapLocationMessage() }}</div> }
-        @if (territoryStatus() && !territoryNoticeDismissed()) {
-          <div class="territory-status" [class.outside]="territoryOutside()" role="status">
-            <span>
-              <span class="territory-status-full">Apenas territórios autorizados são exibidos. As restrições serão aplicadas ao salvar.</span>
-              <span class="territory-status-short">Apenas territórios autorizados são exibidos.</span>
-            </span>
-            <button type="button" class="territory-status-dismiss" aria-label="Fechar aviso de territórios"
-              (click)="dismissTerritoryNotice()">×</button>
+      @if (shouldMountMap()) {
+        <div class="map-panel">
+          <div class="map-toolbar">
+            <input placeholder="Buscar endereço" [(ngModel)]="searchText" (keyup.enter)="searchAddress()">
+            <button type="button" [disabled]="searchingAddress()" (click)="searchAddress()">{{ searchingAddress() ? 'Buscando...' : 'Buscar' }}</button>
+            <button type="button" class="secondary" [disabled]="exporting()" (click)="downloadExcel()">{{ exporting() ? 'Gerando...' : 'Excel' }}</button>
           </div>
-        }
-      </div>
+          <div id="visit-map" class="map"></div>
+          <button type="button" class="map-location-button" [disabled]="locatingMap()"
+            aria-label="Centralizar na minha localização" title="Minha localização" (click)="locateUser(true)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v3m0 14v3M2 12h3m14 0h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"></path></svg>
+          </button>
+          @if (mapLocationMessage()) { <div class="map-location-message">{{ mapLocationMessage() }}</div> }
+          @if (territoryStatus() && !territoryNoticeDismissed()) {
+            <div class="territory-status" [class.outside]="territoryOutside()" role="status">
+              <span>
+                <span class="territory-status-full">Apenas territórios autorizados são exibidos. As restrições serão aplicadas ao salvar.</span>
+                <span class="territory-status-short">Apenas territórios autorizados são exibidos.</span>
+              </span>
+              <button type="button" class="territory-status-dismiss" aria-label="Fechar aviso de territórios"
+                (click)="dismissTerritoryNotice()">×</button>
+            </div>
+          }
+        </div>
+      }
 
       <aside class="side-panel">
         @if (canManageVisits()) {
@@ -309,6 +311,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   deletingId = signal<number | null>(null);
   pendingOpen = signal(false);
   mobileView = signal<'form' | 'map'>('form');
+  mobileViewport = signal(this.isMobileViewport());
   geolocationState = signal<'idle' | 'loading' | 'success' | 'denied' | 'unavailable' | 'timeout'>('idle');
   geolocationMessage = signal('');
   locatingMap = signal(false);
@@ -344,6 +347,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   private createdPhotoUrls = new Set<string>();
   private mobileFormDraft: VisitFormDraft | null = null;
   private reloadVisitsAfterCurrentRequest = false;
+  private mapGeneration = 0;
 
   constructor(
     public api: ApiService,
@@ -356,7 +360,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches) {
+    if (this.mobileViewport()) {
       this.restorePersistedVisitDraft();
     }
   }
@@ -380,7 +384,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    if (!window.matchMedia('(max-width: 900px)').matches) this.initializeMap();
+    if (!this.mobileViewport()) this.initializeMap();
     this.loadTerritories();
     this.loadVisits();
     if (!this.canManageVisits()) this.refreshHandle = setInterval(() => this.loadVisits(), 30000);
@@ -393,33 +397,34 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private initializeMap(): void {
     if (this.map) return;
-    this.map = L.map('visit-map', {
+    const container = document.getElementById('visit-map');
+    if (!container) return;
+    const generation = ++this.mapGeneration;
+    const map = L.map(container, {
       zoomControl: false,
       minZoom: missionCityMap.minZoom,
       maxZoom: missionCityMap.maxZoom,
       maxBounds: this.missionAreaBounds,
       maxBoundsViscosity: 0.9
     }).setView(missionCityMap.center, missionCityMap.initialZoom);
-    L.control.zoom({ position: 'bottomright' }).addTo(this.map);
-    missionCityMaps.forEach(city => this.addOfflineCityLayer(city));
-    this.territoryLayer.addTo(this.map);
-    this.visitLayer.addTo(this.map);
-    this.map.on('click', (event: L.LeafletMouseEvent) => {
+    this.map = map;
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    missionCityMaps.forEach(city => this.addOfflineCityLayer(city, map, generation));
+    this.territoryLayer.addTo(map);
+    this.visitLayer.addTo(map);
+    map.on('click', (event: L.LeafletMouseEvent) => {
       if (this.canModifyVisit()) {
         this.selectPoint(event.latlng.lat, event.latlng.lng);
       }
     });
     if (this.hasSelectedPoint()) {
-      this.marker = L.marker([Number(this.form.latitude), Number(this.form.longitude)]).addTo(this.map);
+      this.marker = L.marker([Number(this.form.latitude), Number(this.form.longitude)]).addTo(map);
     }
     this.renderTerritories();
     this.renderMarkers(this.visits());
   }
 
-  private async addOfflineCityLayer(city: MissionCityMapProfile): Promise<void> {
-    if (!this.map) {
-      return;
-    }
+  private async addOfflineCityLayer(city: MissionCityMapProfile, map: L.Map, generation: number): Promise<void> {
     try {
       const response = await fetch(city.mapArchiveUrl);
       if (!response.ok) {
@@ -441,8 +446,10 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
         noWrap: true,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | <a href="https://protomaps.com">Protomaps</a>'
       });
-      offlineCityLayer['addTo'](this.map);
+      if (this.map !== map || this.mapGeneration !== generation) return;
+      offlineCityLayer['addTo'](map);
     } catch {
+      if (this.map !== map || this.mapGeneration !== generation) return;
       if (!this.mapTileWarningShown) {
         this.mapTileWarningShown = true;
         this.notifications.info(`O mapa offline de ${city.name} não pôde carregar completamente.`);
@@ -459,7 +466,9 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     window.removeEventListener('resize', this.handleResize);
     window.removeEventListener('orientationchange', this.handleResize);
     this.createdPhotoUrls.forEach((url) => URL.revokeObjectURL(url));
-    this.map?.remove();
+    this.createdPhotoUrls.clear();
+    this.closeMapOverlays();
+    this.destroyMap();
   }
 
   loadVisits(): void {
@@ -776,10 +785,12 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   showMobileView(view: 'form' | 'map'): void {
+    this.closeMapOverlays();
     if (view === 'map') {
       this.preserveVisitDraft();
     } else {
       this.restoreVisitDraft();
+      if (this.mobileViewport()) this.destroyMap();
     }
     this.mobileView.set(view);
     if (view === 'map') {
@@ -792,6 +803,33 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
         document.querySelector('.mobile-view-toggle')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }));
     }
+  }
+
+  shouldMountMap(): boolean {
+    return !this.mobileViewport() || this.mobileView() === 'map';
+  }
+
+  private closeMapOverlays(): void {
+    this.locationActionsOpen.set(false);
+    this.closeVisitDetails();
+    this.closePhoto();
+  }
+
+  private destroyMap(): void {
+    this.mapGeneration++;
+    const map = this.map;
+    this.map = undefined;
+    if (map) {
+      map.off();
+      map.remove();
+    }
+    this.marker = undefined;
+    this.userLocationMarker = undefined;
+    this.userCoordinates = undefined;
+    this.visitLayer.clearLayers();
+    this.territoryLayer.clearLayers();
+    this.locatingMap.set(false);
+    this.mapLocationMessage.set('');
   }
 
   useMyLocation(): void {
@@ -1642,17 +1680,29 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   };
 
   private handleResize = (): void => {
-    if (!this.map || (window.matchMedia('(max-width: 900px)').matches && this.mobileView() !== 'map')) return;
-    requestAnimationFrame(() => {
-      this.map?.invalidateSize();
-      this.refreshMapView();
+    this.zone.run(() => {
+      const mobile = this.isMobileViewport();
+      this.mobileViewport.set(mobile);
+      if (mobile && this.mobileView() !== 'map') {
+        this.destroyMap();
+        return;
+      }
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        this.initializeMap();
+        this.map?.invalidateSize();
+        this.refreshMapView();
+      }));
     });
   };
 
   private scrollMapIntoView(): void {
-    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches) {
+    if (this.isMobileViewport()) {
       this.showMobileView('map');
     }
+  }
+
+  private isMobileViewport(): boolean {
+    return typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches;
   }
 
   private updateTerritoryStatus(): void {
