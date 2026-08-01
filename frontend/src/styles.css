@@ -1151,7 +1151,19 @@ app-date-picker { min-width: 0; display: block; width: 100%; }
 }
 .date-picker-calendar:hover { background: var(--color-hover); }
 .date-picker-calendar svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.date-picker-native { position: absolute; right: 8px; bottom: 2px; width: 1px; height: 1px; padding: 0; opacity: 0; pointer-events: none; }
+.date-picker-native {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  right: 2px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
 .date-picker-time { min-width: 0; display: grid; gap: 6px; }
 .date-picker-time span { color: var(--text); font-size: 13px; font-weight: 650; }
 .date-picker-time input { width: 100%; min-height: 48px; border-radius: 14px; }

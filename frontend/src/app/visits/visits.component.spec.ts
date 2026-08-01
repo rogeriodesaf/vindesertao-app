@@ -85,4 +85,13 @@ describe('VisitsComponent map lifecycle', () => {
     expect(component.visitHistoryState()).toBe('not-downloaded');
     expect(component.error()).toBe('');
   });
+
+  it('inicia uma nova ficha em Rio Tinto e aplica a máscara de telefone', () => {
+    expect((component as any).blankVisit().city).toBe('Rio Tinto');
+
+    component.form = (component as any).blankVisit();
+    component.updatePhone('83999999999');
+
+    expect(component.form.phone).toBe('(83) 99999-9999');
+  });
 });

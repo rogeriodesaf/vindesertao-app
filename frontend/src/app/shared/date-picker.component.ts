@@ -74,7 +74,16 @@ export class DatePickerComponent implements ControlValueAccessor, Validator {
   openCalendar(): void {
     if (this.disabled || !this.nativeInput) return;
     const input = this.nativeInput.nativeElement;
-    try { input.showPicker(); } catch { input.click(); }
+    input.focus({ preventScroll: true });
+    try {
+      if (typeof input.showPicker === 'function') {
+        input.showPicker();
+        return;
+      }
+    } catch {
+      // O Safari/iOS pode bloquear showPicker; o clique nativo abaixo mantém o calendário acessível.
+    }
+    input.click();
   }
 
   onTextInput(event: Event): void {

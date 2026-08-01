@@ -139,7 +139,7 @@ interface VisitFormDraft {
               [open]="openSection() === 'basic'" [error]="sectionError() === 'basic'" (toggle)="toggleSection('basic')">
               <label for="visit-person-name">Nome da pessoa<input id="visit-person-name" name="personName" [(ngModel)]="form.personName" required [attr.aria-invalid]="sectionError() === 'basic' && !form.personName ? true : null" aria-describedby="visit-person-error"></label>
               @if (sectionError() === 'basic' && !form.personName) { <small id="visit-person-error" class="field-error">Informe o nome da pessoa.</small> }
-              <label for="visit-phone">Telefone<input id="visit-phone" name="phone" type="tel" inputmode="tel" [(ngModel)]="form.phone"></label>
+              <label for="visit-phone">Telefone<input id="visit-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="15" placeholder="(83) 99999-9999" [ngModel]="form.phone" (ngModelChange)="updatePhone($event)"></label>
               <label class="check-row" for="visit-wants"><input id="visit-wants" name="wantsVisits" type="checkbox" [(ngModel)]="form.wantsVisits"> Deseja receber visitas?</label>
               <label for="visit-prayer">Pedido de oração<textarea id="visit-prayer" name="prayerRequest" [(ngModel)]="form.prayerRequest"></textarea></label>
               <label for="visit-notes">Observações<textarea id="visit-notes" name="notes" [(ngModel)]="form.notes"></textarea></label>
@@ -275,7 +275,7 @@ interface VisitFormDraft {
           }
           <dl class="visit-details-grid">
             <div><dt>Nome</dt><dd>{{ visit.personName }}</dd></div>
-            @if (visit.phone) { <div><dt>Telefone</dt><dd>{{ visit.phone }}</dd></div> }
+            @if (visit.phone) { <div><dt>Telefone</dt><dd>{{ formatPhone(visit.phone) }}</dd></div> }
             <div><dt>Localização</dt><dd>{{ visitAddress(visit) }}</dd></div>
             <div><dt>Data e hora</dt><dd>{{ formatDate(visit.createdAt) }}</dd></div>
             @if (visit.teamName) { <div><dt>Equipe</dt><dd>{{ visit.teamName }}</dd></div> }
@@ -774,7 +774,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     this.clearVisitDraft();
     this.api.visit(visit.id).subscribe((fullVisit) => {
       const editingAsAdmin = this.isAdmin();
-      this.form = { ...fullVisit };
+      this.form = { ...fullVisit, phone: this.formatPhone(fullVisit.phone) };
       this.editingId.set(fullVisit.id ?? null);
       this.mobileView.set('form');
       this.openSection.set('basic');
@@ -1197,6 +1197,19 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     return formatDateTime(value);
   }
 
+  updatePhone(value: string): void {
+    this.form.phone = this.formatPhone(value);
+  }
+
+  formatPhone(value?: string): string {
+    const digits = (value || '').replace(/\D/g, '').slice(0, 11);
+    if (!digits) return '';
+    if (digits.length <= 2) return `(${digits}`;
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  }
+
   toLocalDateTime(value?: string): string {
     if (!value) {
       return '';
@@ -1541,7 +1554,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private blankVisit(): Visit {
-    return { personName: '', city: 'Sertao', wantsVisits: true };
+    return { personName: '', city: 'Rio Tinto', wantsVisits: true };
   }
 
   private preserveVisitDraft(): void {
