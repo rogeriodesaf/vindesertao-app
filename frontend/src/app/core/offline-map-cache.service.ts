@@ -21,6 +21,11 @@ export interface OfflineMapArchive {
   version: string;
 }
 
+export interface OfflineVisitSnapshot {
+  items: Visit[];
+  available: boolean;
+}
+
 interface MapSnapshot<T> {
   key: MapSnapshotKey;
   value: T;
@@ -41,6 +46,14 @@ export class OfflineMapCacheService {
 
   loadVisits(): Promise<Visit[]> {
     return this.load<Visit[]>('visits', []);
+  }
+
+  async loadVisitsSnapshot(): Promise<OfflineVisitSnapshot> {
+    const snapshot = await this.loadSnapshot<Visit[]>('visits');
+    return {
+      items: snapshot?.value ?? [],
+      available: !!snapshot
+    };
   }
 
   loadTerritories(): Promise<Territory[]> {
@@ -162,16 +175,20 @@ export class OfflineMapCacheService {
   }
 
   private async load<T>(key: MapSnapshotKey, fallback: T): Promise<T> {
+    return (await this.loadSnapshot<T>(key))?.value ?? fallback;
+  }
+
+  private async loadSnapshot<T>(key: MapSnapshotKey): Promise<MapSnapshot<T> | undefined> {
     try {
       const db = await this.db();
-      return await new Promise<T>((resolve, reject) => {
+      return await new Promise<MapSnapshot<T> | undefined>((resolve, reject) => {
         const transaction = db.transaction('map-snapshots', 'readonly');
         const request = transaction.objectStore('map-snapshots').get(key);
-        request.onsuccess = () => resolve((request.result as MapSnapshot<T> | undefined)?.value ?? fallback);
+        request.onsuccess = () => resolve(request.result as MapSnapshot<T> | undefined);
         request.onerror = () => reject(request.error);
       });
     } catch {
-      return fallback;
+      return undefined;
     }
   }
 

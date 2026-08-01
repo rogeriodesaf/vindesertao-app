@@ -57,4 +57,32 @@ describe('VisitsComponent map lifecycle', () => {
     expect((component as any).marker).toBeUndefined();
     expect((component as any).userLocationMarker).toBeUndefined();
   });
+
+  it('oculta o badge e orienta a primeira sincronização quando o histórico não foi baixado', () => {
+    component.visitHistoryState.set('not-downloaded');
+
+    expect(component.visitHistoryBadge()).toBe('');
+    expect(component.visitHistoryEmptyMessage()).toContain('sincronize uma vez');
+  });
+
+  it('exibe zero somente depois que uma fonte de dados foi carregada', () => {
+    component.visits.set([]);
+    component.visitHistoryState.set('cached');
+
+    expect(component.visitHistoryBadge()).toBe('0 visita(s)');
+    expect(component.visitHistoryEmptyMessage()).toBe('Nenhuma visita encontrada.');
+  });
+
+  it('usa o estado informativo sem erro quando API e cache estão indisponíveis', async () => {
+    (component as any).offlineMapCache = {
+      loadVisitsSnapshot: () => Promise.resolve({ items: [], available: false })
+    };
+    spyOn<any>(component, 'renderMarkers');
+
+    (component as any).loadCachedVisits();
+    await Promise.resolve();
+
+    expect(component.visitHistoryState()).toBe('not-downloaded');
+    expect(component.error()).toBe('');
+  });
 });

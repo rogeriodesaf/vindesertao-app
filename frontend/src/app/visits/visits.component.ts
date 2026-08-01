@@ -24,6 +24,7 @@ import { DateRangeFilterComponent } from '../shared/date-range-filter.component'
 type VisitFormSection = 'basic' | 'location' | 'photo' | 'more' | 'visits';
 type LocationSource = 'none' | 'gps' | 'map' | 'manual' | 'address';
 type VisitMarkerCategory = 'common' | 'photo' | 'prayer';
+type VisitHistoryState = 'loading' | 'loaded' | 'cached' | 'not-downloaded';
 interface VisitFormDraft {
   form: Visit;
   editingId: number | null;
@@ -46,10 +47,24 @@ interface VisitFormDraft {
     <section class="workspace" [class.mobile-map-view]="mobileView() === 'map'">
       @if (shouldMountMap()) {
         <div class="map-panel">
-          <div class="map-toolbar">
-            <input placeholder="Buscar endereço" [(ngModel)]="searchText" (keyup.enter)="searchAddress()">
-            <button type="button" [disabled]="searchingAddress()" (click)="searchAddress()">{{ searchingAddress() ? 'Buscando...' : 'Buscar' }}</button>
-            <button type="button" class="secondary" [disabled]="exporting()" (click)="downloadExcel()">{{ exporting() ? 'Gerando...' : 'Excel' }}</button>
+          <div class="map-top-controls">
+            <div class="map-toolbar">
+              <input placeholder="Buscar endereço" [(ngModel)]="searchText" (keyup.enter)="searchAddress()">
+              <button type="button" [disabled]="searchingAddress()" (click)="searchAddress()">{{ searchingAddress() ? 'Buscando...' : 'Buscar' }}</button>
+              <button type="button" class="secondary" [disabled]="exporting()" (click)="downloadExcel()">{{ exporting() ? 'Gerando...' : 'Excel' }}</button>
+            </div>
+            @if (territories().length) {
+              <details class="visit-territory-legend">
+                <summary>Territórios</summary>
+                @for (territory of territories(); track territory.id) {
+                  <div>
+                    <span [style.background]="territory.color"></span>
+                    <strong>{{ territory.teamName || territory.name }}</strong>
+                    <small>{{ territory.houseCount || 0 }} casas</small>
+                  </div>
+                }
+              </details>
+            }
           </div>
           <div id="visit-map" class="map"></div>
           <button type="button" class="map-location-button" [disabled]="locatingMap()"
@@ -57,18 +72,6 @@ interface VisitFormDraft {
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v3m0 14v3M2 12h3m14 0h3M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"></path></svg>
           </button>
           @if (mapLocationMessage()) { <div class="map-location-message">{{ mapLocationMessage() }}</div> }
-          @if (territories().length) {
-            <details class="visit-territory-legend">
-              <summary>Territórios</summary>
-              @for (territory of territories(); track territory.id) {
-                <div>
-                  <span [style.background]="territory.color"></span>
-                  <strong>{{ territory.teamName || territory.name }}</strong>
-                  <small>{{ territory.houseCount || 0 }} casas</small>
-                </div>
-              }
-            </details>
-          }
           @if (territoryStatus() && !territoryNoticeDismissed()) {
             <div class="territory-status" [class.outside]="territoryOutside()" role="status">
               <span>
@@ -183,7 +186,7 @@ interface VisitFormDraft {
             </app-form-section>
 
             <app-form-section title="Visitas da equipe" subtitle="Histórico de visitas" icon="groups" tone="blue" sectionId="visit-team-history"
-              [badge]="visits().length + ' visita(s)'" [open]="openSection() === 'visits'" (toggle)="toggleSection('visits')">
+              [badge]="visitHistoryBadge()" [open]="openSection() === 'visits'" (toggle)="toggleSection('visits')">
               <div class="filters visit-section-filters">
                 <div class="form-grid">
                   <input aria-label="Filtrar por bairro" placeholder="Bairro" [(ngModel)]="filters.neighborhood" [ngModelOptions]="{standalone: true}" (keyup.enter)="loadVisits()">
@@ -196,7 +199,9 @@ interface VisitFormDraft {
               </div>
               <div class="visit-list unified-list">@for (visit of visits(); track visit.id) { <app-list-card [title]="visit.personName" [interactive]="true"
                 [actions]="visitActions(visit)" [actionsInline]="true" (activate)="selectVisit(visit)"
-                (action)="handleVisitAction(visit, $event)" [infos]="visitCardInfos(visit)" /> } @empty { <app-empty-state message="Nenhuma visita encontrada." /> }</div>
+                (action)="handleVisitAction(visit, $event)" [infos]="visitCardInfos(visit)" /> } @empty {
+                  <app-empty-state [class.visit-history-not-downloaded]="visitHistoryState() === 'not-downloaded'" [message]="visitHistoryEmptyMessage()" />
+                }</div>
             </app-form-section>
             @if (message()) {
               <p class="success">{{ message() }}</p>
@@ -241,7 +246,9 @@ interface VisitFormDraft {
           </div>
           <div class="visit-list unified-list">@for (visit of visits(); track visit.id) { <app-list-card [title]="visit.personName" [interactive]="true"
             [actions]="visitActions(visit)" [actionsInline]="true" (activate)="selectVisit(visit)"
-            (action)="handleVisitAction(visit, $event)" [infos]="visitCardInfos(visit)" /> } @empty { <app-empty-state message="Nenhuma visita encontrada." /> }</div>
+            (action)="handleVisitAction(visit, $event)" [infos]="visitCardInfos(visit)" /> } @empty {
+              <app-empty-state [class.visit-history-not-downloaded]="visitHistoryState() === 'not-downloaded'" [message]="visitHistoryEmptyMessage()" />
+            }</div>
         }
       </aside>
     </section>
@@ -327,6 +334,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   online = signal(typeof navigator === 'undefined' ? true : navigator.onLine);
   saving = signal(false);
   loadingVisits = signal(false);
+  visitHistoryState = signal<VisitHistoryState>('loading');
   loadingTerritories = signal(false);
   offlinePackageBusy = signal(false);
   offlinePackageMetadata = signal<OfflinePackageMetadata | null>(null);
@@ -502,13 +510,15 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     if (!this.online()) {
+      this.visitHistoryState.set('loading');
       this.loadCachedVisits();
       return;
     }
+    this.visitHistoryState.set('loading');
     this.loadingVisits.set(true);
     this.api.visits({
       page: 0,
-      size: 100,
+      size: 10000,
       neighborhood: this.filters.neighborhood,
       wantsVisits: this.filters.wantsVisits || undefined,
       from: this.toOffset(this.filters.from),
@@ -527,6 +537,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
             return;
           }
           this.visits.set(page.items);
+          this.visitHistoryState.set('loaded');
           this.renderMarkers(page.items);
           this.refreshMapView();
           if (!this.hasVisitFilters()) {
@@ -534,7 +545,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
               .catch((error) => console.warn('[Mapa offline] Não foi possível salvar as visitas:', error));
           }
         },
-        error: () => this.loadCachedVisits(true)
+        error: () => this.loadCachedVisits()
       });
   }
 
@@ -587,19 +598,21 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private loadCachedVisits(requestFailed = false): void {
-    this.offlineMapCache.loadVisits().then((items) => {
-      if (items.length) {
+  private loadCachedVisits(): void {
+    this.offlineMapCache.loadVisitsSnapshot().then(({ items, available }) => {
+      if (available) {
         const filtered = this.filterCachedVisits(items);
         this.visits.set(filtered);
+        this.visitHistoryState.set('cached');
         this.renderMarkers(filtered);
         this.refreshMapView();
         this.showOfflineMapNotice();
         return;
       }
-      if (requestFailed) {
-        this.fail('Não foi possível carregar as visitas e ainda não há uma cópia offline neste aparelho.');
-      }
+      this.visits.set([]);
+      this.visitHistoryState.set('not-downloaded');
+      this.renderMarkers([]);
+      this.refreshMapView();
     });
   }
 
@@ -1131,6 +1144,22 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   canManageVisits(): boolean {
     const user = this.auth.user();
     return !!user && !user.roles.includes('admin') && user.canRegisterVisits;
+  }
+
+  visitHistoryBadge(): string {
+    return this.visitHistoryState() === 'loaded' || this.visitHistoryState() === 'cached'
+      ? `${this.visits().length} visita(s)`
+      : '';
+  }
+
+  visitHistoryEmptyMessage(): string {
+    if (this.visitHistoryState() === 'not-downloaded') {
+      return 'O histórico ainda não foi baixado neste dispositivo. Conecte-se à internet e sincronize uma vez para utilizá-lo offline.';
+    }
+    if (this.visitHistoryState() === 'loading') {
+      return 'Carregando visitas...';
+    }
+    return 'Nenhuma visita encontrada.';
   }
 
   isAdmin(): boolean {

@@ -32,4 +32,16 @@ describe('OfflineMapCacheService', () => {
     expect((await service.loadVisits())[0].personName).toBe('Visita armazenada');
     expect((await service.loadTerritories())[0].name).toBe('Território armazenado');
   });
+
+  it('distinguishes an empty synchronized history from a missing local snapshot', async () => {
+    await service.saveVisits([]);
+
+    expect(await service.loadVisitsSnapshot()).toEqual({ items: [], available: true });
+  });
+
+  it('returns a safe unavailable state when no local snapshot can be read', async () => {
+    spyOn<any>(service, 'loadSnapshot').and.resolveTo(undefined);
+
+    expect(await service.loadVisitsSnapshot()).toEqual({ items: [], available: false });
+  });
 });
