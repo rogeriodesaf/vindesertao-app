@@ -94,4 +94,34 @@ describe('VisitsComponent map lifecycle', () => {
 
     expect(component.form.phone).toBe('(83) 99999-9999');
   });
+
+  it('permite ao projetista editar somente a própria visita e ao líder as visitas da equipe', () => {
+    (component as any).auth = {
+      user: () => ({ id: 10, name: 'Projetista', email: 'projetista@vinde.com', roles: ['projetista'], teamId: 2, visitTeamIds: [2] })
+    };
+    const ownVisit = { id: 1, personName: 'Própria', city: 'Rio Tinto', wantsVisits: true, responsibleUserId: 10, teamId: 2 };
+    const otherVisit = { id: 2, personName: 'Outra', city: 'Rio Tinto', wantsVisits: true, responsibleUserId: 11, teamId: 2 };
+
+    expect(component.canEditVisit(ownVisit)).toBeTrue();
+    expect(component.canEditVisit(otherVisit)).toBeFalse();
+
+    (component as any).auth.user = () => ({ id: 20, name: 'Líder', email: 'lider@vinde.com', roles: ['lider'], teamId: 2, visitTeamIds: [2] });
+    expect(component.canEditVisit(otherVisit)).toBeTrue();
+  });
+
+  it('orienta o usuário e não chama a API ao tentar editar sem internet', () => {
+    const info = jasmine.createSpy('info');
+    const visit = { id: 1, personName: 'Própria', city: 'Rio Tinto', wantsVisits: true, responsibleUserId: 10, teamId: 2 };
+    (component as any).auth = {
+      user: () => ({ id: 10, name: 'Projetista', email: 'projetista@vinde.com', roles: ['projetista'], teamId: 2, visitTeamIds: [2] })
+    };
+    (component as any).notifications = { info };
+    (component as any).api = { visit: jasmine.createSpy('visit') };
+    component.online.set(false);
+
+    component.edit(visit);
+
+    expect(info).toHaveBeenCalledWith(jasmine.stringContaining('Conecte-se à internet'));
+    expect((component as any).api.visit).not.toHaveBeenCalled();
+  });
 });

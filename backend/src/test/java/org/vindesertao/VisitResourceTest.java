@@ -7,6 +7,7 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
+import org.vindesertao.audit.AuditLog;
 import org.vindesertao.team.Team;
 import org.vindesertao.user.AppUser;
 import org.vindesertao.visit.HouseholdVisit;
@@ -23,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @QuarkusTest
 class VisitResourceTest {
     private static final long OTHER_TEAM_ID = 9002L;
+    private static final long PROJECTIST_ID = 9003L;
+    private static final String PROJECTIST_EMAIL = "projetista.edicao@vindesertao.local";
 
     @Inject
     EntityManager entityManager;
@@ -133,6 +136,59 @@ class VisitResourceTest {
     }
 
     @Test
+    @TestSecurity(user = PROJECTIST_EMAIL, roles = "projetista")
+    void projectistUpdatesOnlyOwnVisit() {
+        Long[] ids = QuarkusTransaction.requiringNew().call(() -> {
+            Team team = Team.findById(1L);
+            AppUser leader = AppUser.<AppUser>find("email", "lider@vindesertao.local").firstResult();
+            entityManager.createNativeQuery("""
+                    insert into app_users(id, name, email, password_hash, roles, team_id, active, created_at,
+                                          must_change_password, can_register_visits, can_view_reports,
+                                          can_access_finance, can_access_children)
+                    values (:id, :name, :email, :password, 'projetista', :teamId, true, current_timestamp,
+                            false, true, false, false, false)
+                    """)
+                    .setParameter("id", PROJECTIST_ID)
+                    .setParameter("name", "Projetista de edição")
+                    .setParameter("email", PROJECTIST_EMAIL)
+                    .setParameter("password", "teste")
+                    .setParameter("teamId", team.id)
+                    .executeUpdate();
+            AppUser projectist = AppUser.findById(PROJECTIST_ID);
+
+            HouseholdVisit ownVisit = testVisit("Visita própria", projectist, team);
+            HouseholdVisit otherVisit = testVisit("Visita de outra pessoa", leader, team);
+            return new Long[]{projectist.id, ownVisit.id, otherVisit.id};
+        });
+
+        String updatedBody = """
+                {
+                  "personName": "Visita própria atualizada",
+                  "city": "Rio Tinto",
+                  "wantsVisits": true
+                }
+                """;
+
+        try {
+            given().contentType(ContentType.JSON).body(updatedBody)
+                    .when().put("/visits/" + ids[1])
+                    .then().statusCode(200)
+                    .body("personName", equalTo("Visita própria atualizada"));
+
+            given().contentType(ContentType.JSON).body(updatedBody)
+                    .when().put("/visits/" + ids[2])
+                    .then().statusCode(403);
+        } finally {
+            QuarkusTransaction.requiringNew().run(() -> {
+                AuditLog.delete("actor.id", ids[0]);
+                HouseholdVisit.deleteById(ids[1]);
+                HouseholdVisit.deleteById(ids[2]);
+                AppUser.deleteById(ids[0]);
+            });
+        }
+    }
+
+    @Test
     @TestSecurity(user = "lider@vindesertao.local", roles = "lider")
     void userStillListsOwnVisitWhenItBelongsToAnotherTeam() {
         Long[] ids = QuarkusTransaction.requiringNew().call(() -> {
@@ -171,5 +227,18 @@ class VisitResourceTest {
                 Team.deleteById(ids[1]);
             });
         }
+    }
+
+    private HouseholdVisit testVisit(String personName, AppUser responsible, Team team) {
+        HouseholdVisit visit = new HouseholdVisit();
+        visit.personName = personName;
+        visit.city = "Rio Tinto";
+        visit.wantsVisits = true;
+        visit.responsibleUser = responsible;
+        visit.team = team;
+        visit.createdAt = OffsetDateTime.now();
+        visit.createdBy = responsible.email;
+        visit.persist();
+        return visit;
     }
 }

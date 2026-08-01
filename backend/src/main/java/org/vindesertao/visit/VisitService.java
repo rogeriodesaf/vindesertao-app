@@ -73,12 +73,8 @@ public class VisitService {
     @Transactional
     public HouseholdVisit update(Long id, VisitDtos.VisitRequest request) {
         AppUser user = currentUser.entity();
-        boolean admin = currentUser.isAdmin();
-        if (!admin && !currentUser.isLeader()) {
-            throw new ForbiddenException("Somente administradores ou lideres de equipe podem editar fichas ja cadastradas.");
-        }
         HouseholdVisit visit = getAllowed(id, true, user);
-        Team visitTeam = admin ? visit.team : resolveVisitTeam(user);
+        Team visitTeam = visit.team;
         String before = snapshot(visit);
         apply(request, visit);
         validateTerritoryRule(user, visit, visitTeam);
@@ -117,7 +113,7 @@ public class VisitService {
         if (visit.responsibleUser != null && visit.responsibleUser.id.equals(user.id)) {
             return visit;
         }
-        throw new SecurityException(edit ? "Sem permissao para editar esta visita." : "Sem permissao para ver esta visita.");
+        throw new ForbiddenException(edit ? "Sem permissao para editar esta visita." : "Sem permissao para ver esta visita.");
     }
 
     public PanacheQuery<HouseholdVisit> filtered(String neighborhood, Boolean wantsVisits, Long responsibleUserId,

@@ -290,11 +290,15 @@ interface VisitFormDraft {
             @if (visit.streetViewUrl) { <div><dt>Street View</dt><dd><a [href]="visit.streetViewUrl" target="_blank" rel="noopener">Abrir localização</a></dd></div> }
             @if (visit.updatedAt) { <div><dt>Última atualização</dt><dd>{{ formatDate(visit.updatedAt) }}</dd></div> }
           </dl>
-          @if (isAdmin()) {
+          @if (canEditVisit(visit) || isAdmin()) {
             <div class="actions">
-              <button type="button" (click)="edit(visit)">Editar</button>
-              <button type="button" class="secondary" [disabled]="deletingId() === visit.id"
-                (click)="deleteVisit(visit)">{{ deletingId() === visit.id ? 'Excluindo...' : 'Excluir' }}</button>
+              @if (canEditVisit(visit)) {
+                <button type="button" (click)="edit(visit)">Editar</button>
+              }
+              @if (isAdmin()) {
+                <button type="button" class="secondary" [disabled]="deletingId() === visit.id"
+                  (click)="deleteVisit(visit)">{{ deletingId() === visit.id ? 'Excluindo...' : 'Excluir' }}</button>
+              }
             </div>
           }
         </section>
@@ -745,6 +749,10 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     const payload = normalizeOfflineVisit(this.form);
     const editing = !!this.editingId();
+    if (editing && !this.online()) {
+      this.notifications.info('Conecte-se à internet para salvar alterações nesta visita. As fichas novas pendentes não serão afetadas.');
+      return;
+    }
     this.saving.set(true);
     if (!editing && typeof navigator !== 'undefined' && !navigator.onLine) {
       this.enqueueOffline(payload);
@@ -767,7 +775,11 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   edit(visit: Visit): void {
-    if (!visit.id) {
+    if (!visit.id || !this.canEditVisit(visit)) {
+      return;
+    }
+    if (!this.online()) {
+      this.notifications.info('Conecte-se à internet para editar esta visita. As fichas novas pendentes continuarão salvas neste aparelho.');
       return;
     }
     this.closeVisitDetails();
@@ -807,16 +819,19 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   visitActions(visit: Visit): ListCardAction[] {
-    if (!this.isAdmin()) return [];
-    return [
-      { id: 'edit', label: 'Editar', icon: 'edit' },
-      {
+    const actions: ListCardAction[] = [];
+    if (this.canEditVisit(visit)) {
+      actions.push({ id: 'edit', label: 'Editar', icon: 'edit' });
+    }
+    if (this.isAdmin()) {
+      actions.push({
         id: 'delete',
         label: this.deletingId() === visit.id ? 'Excluindo...' : 'Excluir',
         icon: 'delete',
         danger: true
-      }
-    ];
+      });
+    }
+    return actions;
   }
 
   handleVisitAction(visit: Visit, action: string): void {
@@ -1164,6 +1179,16 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
 
   isAdmin(): boolean {
     return !!this.auth.user()?.roles.includes('admin');
+  }
+
+  canEditVisit(visit: Visit): boolean {
+    const user = this.auth.user();
+    if (!user || !visit.id) return false;
+    if (user.roles.includes('admin')) return true;
+    const ownsVisit = visit.responsibleUserId === user.id
+      || (!!visit.createdBy && visit.createdBy.toLowerCase() === user.email.toLowerCase());
+    if (ownsVisit) return true;
+    return user.roles.includes('lider') && visit.teamId != null && visit.teamId === user.teamId;
   }
 
   adminEditing(): boolean {
