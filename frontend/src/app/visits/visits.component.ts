@@ -1279,10 +1279,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
       .map((item) => ({ visit: item.visit, createdAt: item.createdAt, pending: true }));
     const located = [...saved, ...pending]
       .filter(({ visit }) => this.validCoordinates(visit.latitude, visit.longitude));
-    const visible = typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches
-      ? located.slice(0, 60)
-      : located;
-    visible.forEach(({ visit, createdAt, pending: isPending }) => {
+    located.forEach(({ visit, createdAt, pending: isPending }) => {
       const coordinates: L.LatLngTuple = [Number(visit.latitude), Number(visit.longitude)];
       const photoSource = this.visitPhotoSource(visit);
       const category = this.markerCategory(visit, !!photoSource);

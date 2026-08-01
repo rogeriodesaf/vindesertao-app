@@ -16,10 +16,8 @@ import org.vindesertao.user.UserTeamMembershipRepository;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @ApplicationScoped
 public class VisitService {
@@ -101,13 +99,10 @@ public class VisitService {
         if (currentUser.isAdmin()) {
             return visit;
         }
+        if (!edit) {
+            return visit;
+        }
         if (currentUser.isLeader() && user.team != null && visit.team != null && user.team.id.equals(visit.team.id)) {
-            return visit;
-        }
-        if (!edit && currentUser.isLeader()) {
-            return visit;
-        }
-        if (!edit && visit.team != null && visibleVisitTeamIds(user).contains(visit.team.id)) {
             return visit;
         }
         if (visit.responsibleUser != null && visit.responsibleUser.id.equals(user.id)) {
@@ -118,24 +113,12 @@ public class VisitService {
 
     public PanacheQuery<HouseholdVisit> filtered(String neighborhood, Boolean wantsVisits, Long responsibleUserId,
                                                  Long teamId, OffsetDateTime from, OffsetDateTime to) {
-        AppUser user = currentUser.entity();
         List<String> where = new ArrayList<>();
         Parameters params = new Parameters();
 
         where.add("lower(coalesce(responsibleUser.roles, '')) not like :adminRole");
         params.and("adminRole", "%admin%");
 
-        if (!currentUser.isAdmin() && !currentUser.isLeader()) {
-            Set<Long> visibleTeamIds = visibleVisitTeamIds(user);
-            if (!visibleTeamIds.isEmpty()) {
-                where.add("(team.id in :visibleTeamIds or responsibleUser.id = :currentUserId)");
-                params.and("visibleTeamIds", visibleTeamIds);
-                params.and("currentUserId", user.id);
-            } else {
-                where.add("responsibleUser.id = :currentUserId");
-                params.and("currentUserId", user.id);
-            }
-        }
         if (neighborhood != null && !neighborhood.isBlank()) {
             where.add("lower(neighborhood) like :neighborhood");
             params.and("neighborhood", "%" + neighborhood.toLowerCase() + "%");
@@ -247,17 +230,6 @@ public class VisitService {
                 .firstResultOptional()
                 .map(membership -> membership.team)
                 .orElseThrow(() -> new IllegalArgumentException("Este usuario precisa estar vinculado a uma equipe de evangelismo para registrar visitas."));
-    }
-
-    private Set<Long> visibleVisitTeamIds(AppUser user) {
-        Set<Long> ids = new LinkedHashSet<>();
-        if (user.team != null && user.team.canRegisterVisits) {
-            ids.add(user.team.id);
-        }
-        memberships.find("user.id = ?1 and team.canRegisterVisits = true order by team.name", user.id)
-                .list()
-                .forEach(membership -> ids.add(membership.team.id));
-        return ids;
     }
 
     private String snapshot(HouseholdVisit visit) {

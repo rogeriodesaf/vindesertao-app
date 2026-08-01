@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class VisitResourceTest {
     private static final long OTHER_TEAM_ID = 9002L;
     private static final long PROJECTIST_ID = 9003L;
+    private static final long VISIBLE_OTHER_TEAM_ID = 9004L;
     private static final String PROJECTIST_EMAIL = "projetista.edicao@vindesertao.local";
 
     @Inject
@@ -137,10 +138,18 @@ class VisitResourceTest {
 
     @Test
     @TestSecurity(user = PROJECTIST_EMAIL, roles = "projetista")
-    void projectistUpdatesOnlyOwnVisit() {
+    void projectistViewsEveryVisitButUpdatesOnlyOwnVisit() {
         Long[] ids = QuarkusTransaction.requiringNew().call(() -> {
             Team team = Team.findById(1L);
             AppUser leader = AppUser.<AppUser>find("email", "lider@vindesertao.local").firstResult();
+            entityManager.createNativeQuery("""
+                    insert into teams(id, name, team_type, can_register_visits)
+                    values (:id, :name, 'EVANGELISM', true)
+                    """)
+                    .setParameter("id", VISIBLE_OTHER_TEAM_ID)
+                    .setParameter("name", "Equipe temporária visível no mapa")
+                    .executeUpdate();
+            Team otherTeam = Team.findById(VISIBLE_OTHER_TEAM_ID);
             entityManager.createNativeQuery("""
                     insert into app_users(id, name, email, password_hash, roles, team_id, active, created_at,
                                           must_change_password, can_register_visits, can_view_reports,
@@ -157,8 +166,8 @@ class VisitResourceTest {
             AppUser projectist = AppUser.findById(PROJECTIST_ID);
 
             HouseholdVisit ownVisit = testVisit("Visita própria", projectist, team);
-            HouseholdVisit otherVisit = testVisit("Visita de outra pessoa", leader, team);
-            return new Long[]{projectist.id, ownVisit.id, otherVisit.id};
+            HouseholdVisit otherVisit = testVisit("Visita de outra equipe", leader, otherTeam);
+            return new Long[]{projectist.id, ownVisit.id, otherVisit.id, otherTeam.id};
         });
 
         String updatedBody = """
@@ -170,6 +179,14 @@ class VisitResourceTest {
                 """;
 
         try {
+            given().when().get("/visits?page=0&size=100")
+                    .then().statusCode(200)
+                    .body("items.id", hasItem(ids[2].intValue()));
+
+            given().when().get("/visits/" + ids[2])
+                    .then().statusCode(200)
+                    .body("personName", equalTo("Visita de outra equipe"));
+
             given().contentType(ContentType.JSON).body(updatedBody)
                     .when().put("/visits/" + ids[1])
                     .then().statusCode(200)
@@ -184,6 +201,7 @@ class VisitResourceTest {
                 HouseholdVisit.deleteById(ids[1]);
                 HouseholdVisit.deleteById(ids[2]);
                 AppUser.deleteById(ids[0]);
+                Team.deleteById(ids[3]);
             });
         }
     }
