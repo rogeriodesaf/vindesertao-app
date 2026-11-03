@@ -1,6 +1,7 @@
 export type Role = 'admin' | 'lider' | 'projetista' | 'visualizador';
 
 export type EditionStatus = 'PREPARATION' | 'ACTIVE' | 'CLOSED';
+export interface PublicEdition { year: number; locality: string; }
 export interface Edition {
   id: number;
   year: number;

@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 public class EditionDtos {
+    public record PublicEditionResponse(Integer year, String locality) {}
     public record EditionRequest(Integer year, String name, String locality, LocalDate startsOn, LocalDate endsOn) {}
     public record EditionResponse(Long id, Integer year, String name, String locality, LocalDate startsOn,
                                   LocalDate endsOn, EditionStatus status, OffsetDateTime createdAt) {

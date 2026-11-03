@@ -2125,6 +2125,41 @@ tbody tr:hover { background: var(--color-hover); }
 .editions-page { max-width: 1120px; margin: 0 auto; }
 .login-register-link { display: block; margin-top: 12px; color: var(--color-primary-readable); text-align: center; font-weight: 750; text-decoration: none; }
 .login-help { margin: -4px 0 4px; font-size: 13px; line-height: 1.4; }
+app-login .login-page {
+  align-content: start;
+  min-height: calc(100dvh - 42px);
+  padding-top: max(calc(env(safe-area-inset-top, 0px) + 58px), clamp(58px, 9vh, 88px));
+  background: linear-gradient(180deg, rgba(255, 250, 242, .36), rgba(255, 250, 242, .82)),
+    url('/assets/fundo-vinde-textura.jpg') center/cover, var(--color-background);
+}
+:root[data-theme="dark"] app-login .login-page {
+  background: linear-gradient(180deg, rgba(15, 28, 19, .82), rgba(15, 28, 19, .94)),
+    url('/assets/fundo-vinde-textura.jpg') center/cover, var(--color-background);
+}
+app-login .login-page .login-panel { max-width: 420px; gap: 12px; padding: 22px; border-radius: 20px; box-shadow: var(--shadow); }
+app-login .login-page .login-logo { gap: 4px; margin-bottom: 0; }
+app-login .login-page .login-logo img { width: min(250px, 100%); max-height: 126px; }
+app-login .login-edition { margin: 0 0 4px; color: var(--color-primary-readable); font-size: 13px; font-weight: 800; text-align: center; }
+:root[data-theme="dark"] app-login .login-edition { color: #005B32; }
+app-login .login-page .login-field { gap: 5px; }
+app-login .login-panel .login-field > input,
+app-login .login-panel .password-field input { min-height: 50px; }
+app-login .login-page .login-theme-toggle { width: 44px; min-width: 44px; min-height: 44px; box-shadow: 0 4px 12px rgba(52, 39, 22, .12); }
+app-login .login-page .login-theme-toggle svg { width: 19px; height: 19px; }
+app-login .login-submit { min-height: 52px; box-shadow: 0 4px 12px rgba(86, 38, 9, .14); }
+app-login .login-first-access { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; margin: 0; color: var(--muted); font-size: 14px; }
+app-login .login-first-access a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 10px; background: var(--color-selected); color: var(--color-primary-readable); font-weight: 800; text-decoration: none; }
+app-login .login-first-access a:hover { background: var(--color-hover); text-decoration: underline; }
+.login-panel input:-webkit-autofill,
+.login-panel input:-webkit-autofill:hover,
+.login-panel input:-webkit-autofill:focus { -webkit-text-fill-color: var(--color-text); box-shadow: inset 0 0 0 100px var(--color-field); caret-color: var(--color-text); }
+@media (max-width: 359px), (max-height: 620px) {
+  app-login .login-page .login-panel { gap: 9px; padding: 17px; }
+  app-login .login-page .login-logo img { width: min(210px, 100%); max-height: 105px; }
+}
+@media (max-width: 900px) {
+  body:has(app-login):not(:has(.mobile-bottom-nav)) { padding-bottom: 0; }
+}
 .edition-form { margin-bottom: 16px; }
 .edition-form h2 { margin-top: 0; }
 .edition-row { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--line); }

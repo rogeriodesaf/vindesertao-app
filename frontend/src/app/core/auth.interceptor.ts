@@ -7,7 +7,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const token = auth.token();
   const isExternal = req.url.startsWith('https://nominatim.openstreetmap.org');
-  if (!token || isExternal) {
+  const isPublicEdition = req.url.endsWith('/editions/public-active');
+  if (!token || isExternal || isPublicEdition) {
     return next(req);
   }
   return next(req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })).pipe(
