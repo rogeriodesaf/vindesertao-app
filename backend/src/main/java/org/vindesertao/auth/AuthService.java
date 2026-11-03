@@ -48,7 +48,7 @@ public class AuthService {
     }
 
     @Transactional
-    public void register(RegisterRequest request) {
+    public LoginResponse register(RegisterRequest request) {
         String email = request.email().trim().toLowerCase();
         if (users.findByEmail(email).isPresent()) {
             throw new WebApplicationException(
@@ -60,8 +60,8 @@ public class AuthService {
         user.name = request.name().trim();
         user.email = email;
         user.passwordHash = hashPassword(request.password());
-        user.roles = "projetista";
-        user.active = false;
+        user.roles = "visualizador";
+        user.active = true;
         user.mustChangePassword = false;
         user.canRegisterVisits = false;
         user.canViewReports = false;
@@ -69,6 +69,7 @@ public class AuthService {
         user.canAccessChildren = false;
         users.persist(user);
         auditService.log("CREATE", "USER_REGISTRATION", user.id, null, "{\"email\":\"" + email.replace("\"", "") + "\"}");
+        return toResponse(user);
     }
 
     public String hashPassword(String rawPassword) {

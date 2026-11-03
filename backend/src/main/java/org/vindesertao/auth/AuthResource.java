@@ -42,15 +42,15 @@ public class AuthResource {
     @PermitAll
     @Transactional
     public Response register(@Valid RegisterRequest request) {
-        authService.register(request);
+        LoginResponse response = authService.register(request);
         return Response.status(Response.Status.CREATED)
-                .entity(Map.of("message", "Cadastro recebido. Aguarde a aprovacao do administrador."))
+                .entity(response)
                 .build();
     }
 
     @POST
     @Path("/change-password")
-    @RolesAllowed({"admin", "lider", "projetista"})
+    @RolesAllowed({"admin", "lider", "projetista", "visualizador"})
     @Transactional
     public LoginResponse changePassword(@Valid ChangePasswordRequest request) {
         return authService.changePassword(currentUser.entity(), request);

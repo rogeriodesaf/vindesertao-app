@@ -17,6 +17,24 @@ describe('VisitsComponent map lifecycle', () => {
     );
   });
 
+  it('abre somente o mapa para Visualizador e não consulta fichas privadas', () => {
+    const visits = jasmine.createSpy('visits');
+    const territories = jasmine.createSpy('territories');
+    (component as any).auth = { user: () => ({ roles: ['visualizador'], canRegisterVisits: false }) };
+    (component as any).api = { visits, territories };
+    component.mobileViewport.set(true);
+
+    component.ngOnInit();
+    component.loadVisits();
+    component.loadTerritories();
+    component.showMobileView('form');
+
+    expect(component.mobileView()).toBe('map');
+    expect(component.canManageVisits()).toBeFalse();
+    expect(visits).not.toHaveBeenCalled();
+    expect(territories).not.toHaveBeenCalled();
+  });
+
   it('desmonta o Leaflet e fecha overlays ao voltar para Cadastro no mobile', () => {
     const map = {
       off: jasmine.createSpy('off'),

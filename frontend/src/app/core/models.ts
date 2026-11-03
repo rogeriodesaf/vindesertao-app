@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'lider' | 'projetista';
+export type Role = 'admin' | 'lider' | 'projetista' | 'visualizador';
 
 export type EditionStatus = 'PREPARATION' | 'ACTIVE' | 'CLOSED';
 export interface Edition {

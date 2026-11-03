@@ -11,7 +11,7 @@ import { CompactPaginationComponent } from '../shared/compact-pagination.compone
 import { EmptyStateComponent } from '../shared/empty-state.component';
 import { ListCardAction, ListCardComponent } from '../shared/list-card.component';
 
-const roles: Role[] = ['admin', 'lider', 'projetista'];
+const roles: Role[] = ['admin', 'lider', 'projetista', 'visualizador'];
 
 @Component({
   selector: 'app-users',
@@ -312,9 +312,17 @@ export class UsersComponent implements OnInit {
   }
 
   toggleRole(role: Role): void {
+    if (role === 'visualizador' && !this.form.roles.includes(role)) {
+      this.form.roles = ['visualizador'];
+      this.form.canRegisterVisits = false;
+      this.form.canViewReports = false;
+      this.form.canAccessFinance = false;
+      this.form.canAccessChildren = false;
+      return;
+    }
     this.form.roles = this.form.roles.includes(role)
       ? this.form.roles.filter((current) => current !== role)
-      : [...this.form.roles, role];
+      : [...this.form.roles.filter(current => current !== 'visualizador'), role];
   }
 
   isAdditionalTeamSelected(team: Team): boolean {

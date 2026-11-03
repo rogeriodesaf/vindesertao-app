@@ -41,7 +41,7 @@ interface VisitFormDraft {
   },
   template: `
     <div class="mobile-view-toggle" role="group" aria-label="Visualização da tela de visitas">
-      <button type="button" [class.active]="mobileView() === 'form'" (click)="showMobileView('form')">Cadastro</button>
+      @if (!isViewer()) { <button type="button" [class.active]="mobileView() === 'form'" (click)="showMobileView('form')">Cadastro</button> }
       <button type="button" [class.active]="mobileView() === 'map'" (click)="showMobileView('map')">Mapa</button>
     </div>
     <section class="workspace" [class.mobile-map-view]="mobileView() === 'map'">
@@ -51,7 +51,7 @@ interface VisitFormDraft {
             <div class="map-toolbar">
               <input placeholder="Buscar endereço" [(ngModel)]="searchText" (keyup.enter)="searchAddress()">
               <button type="button" [disabled]="searchingAddress()" (click)="searchAddress()">{{ searchingAddress() ? 'Buscando...' : 'Buscar' }}</button>
-              <button type="button" class="secondary" [disabled]="exporting()" (click)="downloadExcel()">{{ exporting() ? 'Gerando...' : 'Excel' }}</button>
+              @if (!isViewer()) { <button type="button" class="secondary" [disabled]="exporting()" (click)="downloadExcel()">{{ exporting() ? 'Gerando...' : 'Excel' }}</button> }
             </div>
             @if (territories().length) {
               <details class="visit-territory-legend">
@@ -224,7 +224,7 @@ interface VisitFormDraft {
               <button type="button" class="secondary" (click)="locationActionsOpen.set(false)">Cancelar</button>
             </section>
           }
-        } @else {
+        } @else if (!isViewer()) {
           <section class="map-summary-card">
             <h2>Mapa de visitas realizadas</h2>
             <p class="muted">Acompanhe aqui as casas marcadas pelas equipes de evangelismo. O mapa atualiza automaticamente enquanto esta tela estiver aberta.</p>
@@ -232,7 +232,9 @@ interface VisitFormDraft {
           </section>
         }
 
-        @if (!canManageVisits() && !adminEditing()) {
+        @if (isViewer()) {
+          <section class="map-summary-card"><h2>Mapa</h2><p class="muted">Você pode explorar o mapa. Os registros e territórios das equipes ficam disponíveis após autorização do administrador.</p></section>
+        } @else if (!canManageVisits() && !adminEditing()) {
           <div class="filters">
             <h2>{{ visitListTitle() }}</h2>
             <div class="form-grid">
@@ -397,6 +399,10 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
+    if (this.isViewer()) {
+      this.mobileView.set('map');
+      return;
+    }
     if (this.mobileViewport()) {
       this.restorePersistedVisitDraft();
     }
@@ -421,16 +427,18 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    if (!this.mobileViewport()) this.initializeMap();
-    this.loadTerritories();
-    this.loadVisits();
-    if (!this.canManageVisits()) this.refreshHandle = setInterval(() => this.loadVisits(), 30000);
+    if (this.shouldMountMap()) this.initializeMap();
+    if (!this.isViewer()) {
+      this.loadTerritories();
+      this.loadVisits();
+      if (!this.canManageVisits()) this.refreshHandle = setInterval(() => this.loadVisits(), 30000);
+      this.offlineQueue.refreshCount().then(() => this.renderMarkers(this.visits()));
+      this.offlineMapCache.loadPackageMetadata().then(metadata => this.offlinePackageMetadata.set(metadata));
+    }
     window.addEventListener('online', this.handleOnline);
     window.addEventListener('offline', this.handleOffline);
     window.addEventListener('resize', this.handleResize);
     window.addEventListener('orientationchange', this.handleResize);
-    this.offlineQueue.refreshCount().then(() => this.renderMarkers(this.visits()));
-    this.offlineMapCache.loadPackageMetadata().then(metadata => this.offlinePackageMetadata.set(metadata));
   }
 
   private initializeMap(): void {
@@ -528,6 +536,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   loadVisits(): void {
+    if (this.isViewer()) return;
     if (this.loadingVisits()) {
       return;
     }
@@ -572,6 +581,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   loadTerritories(): void {
+    if (this.isViewer()) return;
     if (this.loadingTerritories()) {
       return;
     }
@@ -896,6 +906,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   showMobileView(view: 'form' | 'map'): void {
+    if (this.isViewer()) return;
     this.closeMapOverlays();
     if (view === 'map') {
       this.preserveVisitDraft();
@@ -1188,7 +1199,11 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
 
   canManageVisits(): boolean {
     const user = this.auth.user();
-    return !!user && !user.roles.includes('admin') && user.canRegisterVisits;
+    return !!user && !user.roles.includes('admin') && !user.roles.includes('visualizador') && user.canRegisterVisits;
+  }
+
+  isViewer(): boolean {
+    return !!this.auth.user()?.roles.includes('visualizador');
   }
 
   visitHistoryBadge(): string {
@@ -1821,6 +1836,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   private handleOnline = (): void => {
     this.online.set(true);
     this.offlineMapNoticeShown = false;
+    if (this.isViewer()) return;
     this.loadVisits();
     this.loadTerritories();
     this.offlineQueue.refreshCount().then(() => this.renderMarkers(this.visits()));
@@ -1828,7 +1844,9 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private handleOffline = (): void => {
     this.online.set(false);
-    this.notifications.info('Você está sem internet. Novas fichas serão salvas no aparelho.');
+    this.notifications.info(this.isViewer()
+      ? 'Você está sem internet. O mapa online pode não carregar; reconecte-se para navegar.'
+      : 'Você está sem internet. Novas fichas serão salvas no aparelho.');
   };
 
   private handleResize = (): void => {

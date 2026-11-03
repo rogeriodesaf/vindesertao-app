@@ -169,6 +169,13 @@ export class AppComponent {
     if (!user) {
       return [];
     }
+    if (user.roles.includes('visualizador')) {
+      return [{ label: 'Campo', items: [
+        this.item('Mapa', 'Mapa', '/visits', icons.map),
+        this.item('Apoio evangelístico', 'Apoio', '/evangelistic-support', icons.help),
+        this.item('Treinamento Missionário', 'Vídeos', '/missionary-training', icons.training)
+      ] }];
+    }
     const isAdmin = user.roles.includes('admin');
     const canViewDashboard = isAdmin || user.roles.includes('lider') || user.canViewReports || user.canRegisterVisits;
     const canViewTeam = isAdmin || !!user.teamId || user.canRegisterVisits || user.canViewReports;
@@ -228,6 +235,7 @@ export class AppComponent {
     if (roles.includes('admin')) return 'Administrador';
     if (roles.includes('lider')) return 'Líder';
     if (roles.includes('projetista')) return 'Projetista';
+    if (roles.includes('visualizador')) return 'Visualizador';
     return 'Usuário';
   }
 

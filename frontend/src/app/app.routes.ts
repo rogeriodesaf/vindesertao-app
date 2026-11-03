@@ -27,7 +27,7 @@ export const routes: Routes = [
   { path: 'visits', component: VisitsComponent, canActivate: [authGuard] },
   { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard], data: { canViewReports: true } },
   { path: 'social-assistance', component: SocialAssistanceComponent, canActivate: [authGuard], data: { roles: ['admin', 'lider', 'projetista'] } },
-  { path: 'evangelistic-support', component: EvangelisticSupportComponent, canActivate: [authGuard], data: { roles: ['admin', 'lider', 'projetista'] } },
+  { path: 'evangelistic-support', component: EvangelisticSupportComponent, canActivate: [authGuard], data: { roles: ['admin', 'lider', 'projetista', 'visualizador'] } },
   { path: 'missionary-training', component: MissionaryTrainingComponent, canActivate: [authGuard] },
   { path: 'finance', component: FinanceComponent, canActivate: [authGuard], data: { canAccessFinance: true } },
   { path: 'children', component: ChildrenComponent, canActivate: [authGuard], data: { canAccessChildren: true } },

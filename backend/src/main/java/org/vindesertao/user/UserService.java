@@ -48,6 +48,7 @@ public class UserService {
 
     @Transactional
     public AppUser create(UserDtos.CreateUserRequest request) {
+        validateViewerPermissions(request.roles(), request.canRegisterVisits(), request.canViewReports(), request.canAccessFinance(), request.canAccessChildren());
         String normalizedEmail = normalizeEmail(request.email());
         users.findByEmail(normalizedEmail).ifPresent(existing -> {
             throw new IllegalArgumentException("E-mail ja cadastrado.");
@@ -73,6 +74,7 @@ public class UserService {
 
     @Transactional
     public AppUser update(Long id, UserDtos.UpdateUserRequest request) {
+        validateViewerPermissions(request.roles(), request.canRegisterVisits(), request.canViewReports(), request.canAccessFinance(), request.canAccessChildren());
         AppUser user = users.findByIdOptional(id)
                 .orElseThrow(() -> new NotFoundException("Usuario nao encontrado."));
         String before = snapshot(user);
@@ -218,6 +220,13 @@ public class UserService {
         return roles.stream().map(Role::name).sorted().collect(Collectors.joining(","));
     }
 
+    private void validateViewerPermissions(Set<Role> roles, boolean visits, boolean reports, boolean finance, boolean children) {
+        if (roles != null && roles.contains(Role.visualizador)
+                && (roles.size() != 1 || visits || reports || finance || children)) {
+            throw new IllegalArgumentException("O perfil Visualizador deve permanecer somente leitura. Escolha outra função para conceder permissões.");
+        }
+    }
+
     private boolean sameTeam(Team left, Team right) {
         Long leftId = left == null ? null : left.id;
         Long rightId = right == null ? null : right.id;
@@ -279,6 +288,7 @@ public class UserService {
             case "admin" -> "Administradores";
             case "lider" -> "Lideres";
             case "projetista" -> "Projetistas";
+            case "visualizador" -> "Visualizadores";
             default -> role;
         };
     }
