@@ -20,12 +20,15 @@
   --color-selected: #E4EFE1;
   --color-on-primary: #FFFFFF;
   --color-on-accent: #FFFFFF;
+  --color-on-status: #FFFFFF;
   --color-overlay: rgba(17, 24, 39, .48);
   --color-primary-translucent: rgba(0, 91, 50, .18);
   --color-success-surface: #EAF5E8;
   --color-warning-surface: #FFF3E5;
   --color-error-surface: #FDECEB;
   --color-surface-soft: #F6F0E6;
+  --page-texture: url('/assets/fundo-vinde-textura.jpg');
+  --page-texture-wash: rgba(247, 242, 233, .88);
   --shadow: 0 14px 38px rgba(52, 39, 22, .12);
   --shadow-elevated: 0 20px 70px rgba(17, 24, 39, .26);
   --map-filter: none;
@@ -42,28 +45,30 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-background: #17221B;
-  --color-surface: #243127;
-  --color-surface-elevated: #2D3A2F;
-  --color-text: #F5F1E9;
-  --color-text-secondary: #D0D3C6;
-  --color-border: #8C9C89;
-  --color-primary-readable: #B3DCB4;
+  --color-background: #0B1220;
+  --color-surface: #111C2E;
+  --color-surface-elevated: #18263B;
+  --color-text: #F3F4F6;
+  --color-text-secondary: #CBD5E1;
+  --color-border: #71839B;
+  --color-primary-readable: #A9DDB7;
   --color-accent: #FFB56A;
   --color-accent-strong: #D87929;
   --color-on-accent: #28180C;
+  --color-on-status: #0B1220;
   --color-success: #9DD8A1;
   --color-warning: #FFCB8A;
   --color-error: #FFB1A9;
-  --color-field: #1B291F;
-  --color-hover: #354437;
-  --color-selected: #30543A;
+  --color-field: #18263B;
+  --color-hover: #24364D;
+  --color-selected: #233C57;
   --color-overlay: rgba(3, 7, 18, .68);
-  --color-primary-translucent: rgba(179, 220, 180, .2);
-  --color-success-surface: #22422B;
-  --color-warning-surface: #49331E;
-  --color-error-surface: #4A2925;
-  --color-surface-soft: #2A382D;
+  --color-primary-translucent: rgba(169, 221, 183, .2);
+  --color-success-surface: #173A3A;
+  --color-warning-surface: #3C302A;
+  --color-error-surface: #402B35;
+  --color-surface-soft: #16243A;
+  --page-texture: none;
   --shadow: 0 18px 48px rgba(0, 0, 0, .34);
   --shadow-elevated: 0 20px 70px rgba(0, 0, 0, .5);
   --map-filter: brightness(.72) contrast(1.12) saturate(.78);
@@ -79,7 +84,18 @@ html {
   text-size-adjust: 100%;
 }
 body, app-root { width: 100%; max-width: 100%; min-width: 0; }
-body { margin: 0; overflow-x: hidden; background: var(--bg); color: var(--text); }
+body {
+  margin: 0;
+  overflow-x: hidden;
+  background-color: var(--bg);
+  background-image: linear-gradient(var(--page-texture-wash), var(--page-texture-wash)), var(--page-texture);
+  background-position: center top;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color: var(--text);
+}
+:root[data-theme="dark"] body { background-image: none; }
 app-root { display: block; }
 main { min-width: 0; }
 button, input, select, textarea { font: inherit; }
@@ -341,12 +357,14 @@ h2 { font-size: 17px; }
   min-height: calc(100vh - 42px);
   display: grid;
   place-items: center;
-  background: linear-gradient(rgba(255, 250, 242, .18), rgba(255, 250, 242, .18)),
-    url('/assets/fundo-vinde-textura.jpg') center/cover, var(--color-background);
+  background: var(--color-background);
+  background-image: linear-gradient(rgba(255, 250, 242, .16), rgba(255, 250, 242, .30)), var(--page-texture);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 :root[data-theme="dark"] .login-shell {
-  background: linear-gradient(rgba(15, 28, 19, .84), rgba(15, 28, 19, .88)),
-    url('/assets/fundo-vinde-textura.jpg') center/cover, var(--color-background);
+  background: var(--color-background);
 }
 .login-panel {
   width: min(380px, calc(100vw - 32px));
@@ -481,12 +499,14 @@ h2 { font-size: 17px; }
   width: 100%;
   min-height: 56px;
   border-radius: 12px;
-  background: #A8510C;
-  color: #FFFFFF;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
   font-weight: 800;
   box-shadow: 0 8px 20px rgba(86, 38, 9, .18);
 }
-.login-submit:hover { background: #8D4208; }
+.login-submit:hover { background: var(--color-accent-strong); }
+:root[data-theme="dark"] .login-submit { background: var(--color-accent-strong); }
+:root[data-theme="dark"] .login-submit:hover { background: var(--color-accent); }
 .login-forgot-link {
   justify-self: center;
   padding: 2px 4px;
@@ -526,7 +546,7 @@ h2 { font-size: 17px; }
   pointer-events: none;
 }
 .territory-draw-toolbar button { min-height: 44px; border-radius: 999px; pointer-events: auto; box-shadow: var(--shadow); }
-.territory-draw-toolbar .danger-button { background: var(--danger); color: #fff; }
+.territory-draw-toolbar .danger-button { background: var(--danger); color: var(--color-on-status); }
 .territory-instruction {
   position: absolute;
   z-index: 590;
@@ -937,7 +957,7 @@ app-empty-state.visit-history-not-downloaded .list-empty-state {
 .location-summary span:not(.location-summary-icon), .location-summary small { color: var(--muted); overflow-wrap: anywhere; }
 .territory-form-alert { display: flex; gap: 10px; padding: 12px; border: 1px solid var(--color-success); border-radius: 14px; background: var(--color-success-surface); }
 .territory-form-alert.warning { border-color: var(--color-warning); background: var(--color-warning-surface); }
-.territory-form-alert > span { width: 24px; height: 24px; flex: 0 0 24px; display: grid; place-items: center; border-radius: 999px; background: var(--color-success); color: var(--color-on-primary); font-weight: 850; }
+.territory-form-alert > span { width: 24px; height: 24px; flex: 0 0 24px; display: grid; place-items: center; border-radius: 999px; background: var(--color-success); color: var(--color-on-status); font-weight: 850; }
 .territory-form-alert.warning > span { background: var(--color-warning); }
 .territory-form-alert div { display: grid; gap: 2px; }
 .territory-form-alert small { color: var(--text); line-height: 1.35; }
@@ -1337,7 +1357,7 @@ body:has(app-social-assistance) { scroll-padding-bottom: calc(110px + env(safe-a
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: color-mix(in srgb, var(--color-surface-elevated) 72%, transparent);
+  background: var(--color-surface-soft);
 }
 .social-form-section legend {
   padding: 0 7px;
@@ -2129,12 +2149,10 @@ app-login .login-page {
   align-content: start;
   min-height: calc(100dvh - 42px);
   padding-top: max(calc(env(safe-area-inset-top, 0px) + 58px), clamp(58px, 9vh, 88px));
-  background: linear-gradient(180deg, rgba(255, 250, 242, .36), rgba(255, 250, 242, .82)),
-    url('/assets/fundo-vinde-textura.jpg') center/cover, var(--color-background);
+  background-image: linear-gradient(180deg, rgba(255, 250, 242, .16), rgba(255, 250, 242, .48)), var(--page-texture);
 }
 :root[data-theme="dark"] app-login .login-page {
-  background: linear-gradient(180deg, rgba(15, 28, 19, .82), rgba(15, 28, 19, .94)),
-    url('/assets/fundo-vinde-textura.jpg') center/cover, var(--color-background);
+  background: var(--color-background);
 }
 app-login .login-page .login-panel { max-width: 420px; gap: 12px; padding: 22px; border-radius: 20px; box-shadow: var(--shadow); }
 app-login .login-page .login-logo { gap: 4px; margin-bottom: 0; }

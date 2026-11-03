@@ -279,7 +279,7 @@ const MISSIONARY_LESSONS: readonly MissionaryLesson[] = [
       font-size: 12px;
       font-weight: 850;
     }
-    .completed .sequence-marker { border-color: var(--color-success); background: var(--color-success); color: #fff; }
+    .completed .sequence-marker { border-color: var(--color-success); background: var(--color-success); color: var(--color-on-status); }
     .sequence-marker svg { width: 18px; height: 18px; }
     .lesson-item img { width: 126px; aspect-ratio: 16 / 9; display: block; object-fit: cover; border-radius: 7px; }
     .lesson-copy { min-width: 0; display: grid; gap: 3px; }
