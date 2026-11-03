@@ -43,7 +43,22 @@ export class RegisterComponent {
     this.loading.set(true);
     this.auth.register(this.name, this.email, this.password).subscribe({
       next: response => { this.success.set(response.message); this.notifications.success('Cadastro enviado para aprovação.'); },
-      error: (response: HttpErrorResponse) => { this.error.set(response.error?.message || 'Não foi possível criar a conta.'); this.loading.set(false); }
+      error: (response: HttpErrorResponse) => {
+        this.error.set(this.registrationError(response));
+        this.notifications.error(this.error());
+        this.loading.set(false);
+      }
     });
+  }
+
+  private registrationError(response: HttpErrorResponse): string {
+    if (response.status === 0) return 'Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.';
+    if (response.status === 409) return 'Este e-mail já possui cadastro. Tente entrar ou recuperar sua senha.';
+    if (response.status === 400 || response.status === 422) {
+      const detail = response.error?.detail || response.error?.message;
+      return detail || 'Revise nome, e-mail e senha e tente novamente.';
+    }
+    if (response.status === 404) return 'O serviço de cadastro está temporariamente indisponível. Tente novamente mais tarde.';
+    return 'Não foi possível criar a conta agora. Tente novamente em instantes.';
   }
 }

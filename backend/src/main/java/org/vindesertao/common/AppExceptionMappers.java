@@ -8,6 +8,7 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
+import org.jboss.logging.Logger;
 
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
@@ -15,11 +16,19 @@ import java.util.Map;
 
 @Provider
 public class AppExceptionMappers implements ExceptionMapper<Throwable> {
+    private static final Logger LOG = Logger.getLogger(AppExceptionMappers.class);
     @Context
     UriInfo uriInfo;
 
     @Override
     public Response toResponse(Throwable exception) {
+        if (!(exception instanceof ConstraintViolationException)
+                && !(exception instanceof NotFoundException)
+                && !(exception instanceof WebApplicationException)
+                && !(exception instanceof IllegalArgumentException)
+                && !(exception instanceof SecurityException)) {
+            LOG.errorf(exception, "Falha não tratada na API em %s", uriInfo == null ? "" : uriInfo.getPath());
+        }
         if (exception instanceof ConstraintViolationException validation) {
             Map<String, String> errors = new LinkedHashMap<>();
             validation.getConstraintViolations().forEach(v ->
