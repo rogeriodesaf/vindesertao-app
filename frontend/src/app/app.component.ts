@@ -42,7 +42,7 @@ const icons = {
       <div class="app-shell">
         <aside class="desktop-sidebar" aria-label="Menu principal">
           <a class="brand" routerLink="/visits" aria-label="Vinde Sertão">
-            <img src="/assets/logo-vinde-sertao.webp" alt="">
+            <img src="/assets/logo-vinde-oficial-ajustada.png" alt="">
             <span>Vinde Sertão</span>
           </a>
           <nav class="sidebar-nav">
@@ -78,7 +78,7 @@ const icons = {
         <div class="app-content">
           <header class="mobile-topbar">
             <a class="brand" routerLink="/visits" (click)="closeMenu()" aria-label="Vinde Sertão">
-              <img src="/assets/logo-vinde-sertao.webp" alt="">
+              <img src="/assets/logo-vinde-oficial-ajustada.png" alt="">
               <span class="mobile-brand-copy">
                 <strong>Vinde Sertão</strong>
                 <small title="{{ displayName() }} — {{ userRoleLabel() }}">{{ displayName() }} • {{ userRoleLabel() }}</small>

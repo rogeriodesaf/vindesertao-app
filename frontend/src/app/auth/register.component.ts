@@ -17,7 +17,7 @@ import { ThemeService } from '../core/theme.service';
         <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="theme.activeTheme() === 'dark' ? moonIcon : sunIcon"></path></svg>
       </button>
       <form class="login-panel" autocomplete="on" (ngSubmit)="submit()">
-        <div class="login-logo"><img src="/assets/logo-vinde-sertao.webp" alt="Vinde Sertão"></div>
+        <div class="login-logo"><img src="/assets/logo-vinde-oficial-ajustada.png" alt="Vinde Sertão"></div>
         <h1>Criar conta</h1>
         <p class="muted login-help">Crie sua conta para acessar o mapa, o apoio evangelístico e os vídeos. O administrador poderá liberar outras funções depois.</p>
         <label class="login-field">Nome<input name="name" [(ngModel)]="name" autocomplete="name" maxlength="160" required></label>

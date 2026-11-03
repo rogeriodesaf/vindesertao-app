@@ -15,7 +15,7 @@ import { ThemeService } from '../core/theme.service';
     <section class="login-shell">
       <form #recoveryForm="ngForm" class="login-panel" novalidate (ngSubmit)="submit(recoveryForm)">
         <div class="login-logo">
-          <img src="/assets/logo-vinde-sertao.webp" alt="Vinde Sertão">
+          <img src="/assets/logo-vinde-oficial-ajustada.png" alt="Vinde Sertão">
         </div>
         <div>
           <h1>{{ resetting ? 'Criar nova senha' : 'Recuperar senha' }}</h1>

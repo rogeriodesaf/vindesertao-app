@@ -29,7 +29,7 @@ const REMEMBERED_EMAIL_KEY = 'vinde.rememberedEmail';
 
       <form class="login-panel" autocomplete="on" (ngSubmit)="submit()">
         <div class="login-logo">
-          <img src="/assets/logo-vinde-sertao.webp" alt="Vinde Sertao">
+          <img src="/assets/logo-vinde-oficial-ajustada.png" alt="Vinde Sertão">
         </div>
 
         <label class="login-field">
