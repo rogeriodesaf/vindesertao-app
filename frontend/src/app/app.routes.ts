@@ -15,6 +15,7 @@ import { ChildrenComponent } from './children/children.component';
 import { EvangelisticSupportComponent } from './evangelistic-support/evangelistic-support.component';
 import { PasswordRecoveryComponent } from './auth/password-recovery.component';
 import { MissionaryTrainingComponent } from './missionary-training/missionary-training.component';
+import { EditionsComponent } from './editions/editions.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -33,6 +34,7 @@ export const routes: Routes = [
   { path: 'territories', component: TerritoriesComponent, canActivate: [authGuard], data: { roles: ['admin'] } },
   { path: 'duplicates', component: DuplicatesComponent, canActivate: [authGuard], data: { roles: ['admin'] } },
   { path: 'audit', component: AuditComponent, canActivate: [authGuard], data: { roles: ['admin'] } },
+  { path: 'editions', component: EditionsComponent, canActivate: [authGuard], data: { roles: ['admin'] } },
   { path: '', pathMatch: 'full', redirectTo: 'visits' },
   { path: '**', redirectTo: 'visits' }
 ];

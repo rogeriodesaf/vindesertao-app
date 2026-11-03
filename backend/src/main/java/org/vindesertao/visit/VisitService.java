@@ -13,6 +13,8 @@ import org.vindesertao.team.Team;
 import org.vindesertao.territory.TerritoryService;
 import org.vindesertao.user.AppUser;
 import org.vindesertao.user.UserTeamMembershipRepository;
+import org.vindesertao.edition.Edition;
+import org.vindesertao.edition.EditionService;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -41,9 +43,14 @@ public class VisitService {
     @Inject
     PhotoStorageService photoStorage;
 
+    @Inject
+    EditionService editions;
+
     @Transactional
     public HouseholdVisit create(VisitDtos.VisitRequest request) {
         AppUser user = currentUser.entity();
+        Edition edition = editions.active();
+        editions.requireOperationalAccess(user, edition);
         String clientReference = trimToNull(request.clientReference());
         if (clientReference != null) {
             HouseholdVisit existing = visits.find("clientReference = ?1 and responsibleUser.id = ?2", clientReference, user.id).firstResult();
@@ -60,6 +67,7 @@ public class VisitService {
         apply(request, visit);
         visit.responsibleUser = user;
         visit.team = visitTeam;
+        visit.edition = edition;
         validateTerritoryRule(user, visit, visitTeam);
         visit.createdAt = OffsetDateTime.now();
         visit.createdBy = user.email;
@@ -71,6 +79,7 @@ public class VisitService {
     @Transactional
     public HouseholdVisit update(Long id, VisitDtos.VisitRequest request) {
         AppUser user = currentUser.entity();
+        editions.requireOperationalAccess(user, editions.active());
         HouseholdVisit visit = getAllowed(id, true, user);
         Team visitTeam = visit.team;
         String before = snapshot(visit);
@@ -99,6 +108,10 @@ public class VisitService {
         if (currentUser.isAdmin()) {
             return visit;
         }
+        editions.requireOperationalAccess(user, editions.active());
+        if (visit.edition == null || !visit.edition.id.equals(editions.active().id)) {
+            throw new ForbiddenException("Esta ficha pertence a outra edicao.");
+        }
         if (!edit) {
             return visit;
         }
@@ -113,11 +126,14 @@ public class VisitService {
 
     public PanacheQuery<HouseholdVisit> filtered(String neighborhood, Boolean wantsVisits, Long responsibleUserId,
                                                  Long teamId, OffsetDateTime from, OffsetDateTime to) {
+        editions.requireOperationalAccess(currentUser.entity(), editions.active());
         List<String> where = new ArrayList<>();
         Parameters params = new Parameters();
 
         where.add("lower(coalesce(responsibleUser.roles, '')) not like :adminRole");
         params.and("adminRole", "%admin%");
+        where.add("edition.id = :editionId");
+        params.and("editionId", editions.active().id);
 
         if (neighborhood != null && !neighborhood.isBlank()) {
             where.add("lower(neighborhood) like :neighborhood");
@@ -223,7 +239,11 @@ public class VisitService {
         if (!user.canRegisterVisits) {
             throw new IllegalArgumentException("Este usuario ou equipe nao esta autorizado a registrar visitas.");
         }
-        if (user.team != null && user.team.canRegisterVisits) {
+        Team editionTeam = editions.teamFor(user, editions.active());
+        if (editionTeam != null && editionTeam.canRegisterVisits) {
+            return editionTeam;
+        }
+        if (user.team != null && user.team.canRegisterVisits && user.team.edition != null && user.team.edition.id.equals(editions.active().id)) {
             return user.team;
         }
         return memberships.find("user.id = ?1 and team.canRegisterVisits = true order by team.name", user.id)

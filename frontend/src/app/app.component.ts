@@ -29,7 +29,8 @@ const icons = {
   user: 'M20 21a8 8 0 0 0-16 0m8-9a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z',
   territory: 'm3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Zm6-3v15m6-12v15',
   duplicate: 'M8 8h12v12H8V8ZM4 16V4h12',
-  audit: 'M9 11h6m-6 4h4m4 6H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z'
+  audit: 'M9 11h6m-6 4h4m4 6H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z',
+  edition: 'M4 5h16v14H4zM8 3v4m8-4v4M4 10h16'
 };
 
 @Component({
@@ -188,7 +189,8 @@ export class AppComponent {
         this.item('Usuários', 'Usuários', '/users', icons.user),
         this.item('Territórios', 'Territórios', '/territories', icons.territory),
         this.item('Duplicidades', 'Duplicidades', '/duplicates', icons.duplicate),
-        this.item('Auditoria', 'Auditoria', '/audit', icons.audit)
+        this.item('Auditoria', 'Auditoria', '/audit', icons.audit),
+        this.item('Edições', 'Edições', '/editions', icons.edition)
       ] : [] }
     ];
   });

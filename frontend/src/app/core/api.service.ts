@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { environment } from '../../environments/environment';
-import { AppUser, AuditLog, ChildRecord, ChildrenSummary, Dashboard, DuplicateVisitGroup, FinanceSummary, FinancialTransaction, LoginResponse, PageResponse, SocialAssistanceRecord, SocialAssistanceSummary, Team, TeamDetail, Territory, TerritoryDistributionPlan, TerritoryDistributionRequest, UserSummary, UserTeamHistory, Visit } from './models';
+import { AppUser, AuditLog, ChildRecord, ChildrenSummary, Dashboard, DuplicateVisitGroup, Edition, FinanceSummary, FinancialTransaction, LoginResponse, PageResponse, SocialAssistanceRecord, SocialAssistanceSummary, Team, TeamDetail, Territory, TerritoryDistributionPlan, TerritoryDistributionRequest, UserSummary, UserTeamHistory, Visit } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -30,6 +30,13 @@ export class ApiService {
   dashboard(params: Record<string, string | undefined>) {
     return this.http.get<Dashboard>(`${environment.apiBaseUrl}/analytics/dashboard`, { params: this.params(params) });
   }
+
+  editions() { return this.http.get<Edition[]>(`${environment.apiBaseUrl}/editions`); }
+  activeEdition() { return this.http.get<Edition>(`${environment.apiBaseUrl}/editions/active`); }
+  createEdition(edition: Omit<Edition, 'id' | 'status' | 'createdAt'>) { return this.http.post<Edition>(`${environment.apiBaseUrl}/editions`, edition); }
+  setEditionStatus(id: number, status: Edition['status']) { return this.http.put<Edition>(`${environment.apiBaseUrl}/editions/${id}/status/${status}`, {}); }
+  grantEditionAccess(id: number, userId: number, teamId?: number) { return this.http.post(`${environment.apiBaseUrl}/editions/${id}/access`, { userId, teamId }); }
+  editionTeams(id: number) { return this.http.get<Team[]>(`${environment.apiBaseUrl}/editions/${id}/teams`); }
 
   exportVisits(params: Record<string, string | number | boolean | undefined> = {}) {
     return this.http.get(`${environment.apiBaseUrl}/visits/export.xlsx`, {

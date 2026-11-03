@@ -8,6 +8,7 @@ import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
 import org.vindesertao.audit.AuditService;
 import org.vindesertao.auth.CurrentUser;
+import org.vindesertao.edition.EditionService;
 import org.vindesertao.team.Team;
 import org.vindesertao.team.TeamRepository;
 import org.vindesertao.user.AppUser;
@@ -40,6 +41,9 @@ public class TerritoryService {
     CurrentUser currentUser;
 
     @Inject
+    EditionService editions;
+
+    @Inject
     UserTeamMembershipRepository memberships;
 
     @Inject
@@ -53,7 +57,7 @@ public class TerritoryService {
         if (teamIds.isEmpty()) {
             return List.of();
         }
-        return territories.find("active = true and team.id in ?1 order by name", teamIds).list();
+        return territories.find("active = true and edition.id = ?1 and team.id in ?2 order by name", editions.active().id, teamIds).list();
     }
 
     public List<TerritoryDtos.TerritoryResponse> listVisibleResponses() {
@@ -72,7 +76,7 @@ public class TerritoryService {
     }
 
     private List<Territory> list() {
-        return territories.find("order by name").list();
+        return territories.find("edition.id = ?1 order by name", editions.active().id).list();
     }
 
     public List<Territory> enforcedForTeam(Long teamId) {
@@ -82,6 +86,7 @@ public class TerritoryService {
     @Transactional
     public Territory create(TerritoryDtos.TerritoryRequest request) {
         Territory territory = new Territory();
+        territory.edition = editions.active();
         apply(request, territory);
         territory.createdAt = OffsetDateTime.now();
         territories.persist(territory);

@@ -1,5 +1,17 @@
 export type Role = 'admin' | 'lider' | 'projetista';
 
+export type EditionStatus = 'PREPARATION' | 'ACTIVE' | 'CLOSED';
+export interface Edition {
+  id: number;
+  year: number;
+  name: string;
+  locality: string;
+  startsOn?: string;
+  endsOn?: string;
+  status: EditionStatus;
+  createdAt: string;
+}
+
 export interface UserPrincipal {
   id: number;
   name: string;
@@ -31,6 +43,7 @@ export interface PageResponse<T> {
 
 export interface Visit {
   id?: number;
+  editionId?: number;
   personName: string;
   phone?: string;
   street?: string;

@@ -10,6 +10,7 @@ export interface PendingVisit {
   createdAt: string;
   attempts: number;
   lastError?: string;
+  editionId?: number;
   lastAttempt?: {
     endpoint: string;
     status?: number;
@@ -24,6 +25,7 @@ export function normalizeOfflineVisit(source: Visit): Visit {
   const value = source as Visit & Record<string, unknown>;
   const photoData = optionalString(value.photoData);
   return {
+    editionId: optionalNumber(value.editionId),
     personName: requiredString(value.personName),
     phone: optionalString(value.phone),
     street: optionalString(value.street),
@@ -82,12 +84,14 @@ export class OfflineVisitQueueService {
   }
 
   async enqueue(visit: Visit): Promise<void> {
+    const editionId = visit.editionId;
     const db = await this.db();
     await this.write(db, 'readwrite', (store) => {
       store.add({
-        visit: normalizeOfflineVisit({ ...visit, clientReference: visit.clientReference || this.clientReference() }),
+        visit: normalizeOfflineVisit({ ...visit, editionId, clientReference: visit.clientReference || this.clientReference() }),
         createdAt: new Date().toISOString(),
-        attempts: 0
+        attempts: 0,
+        editionId
       });
     });
     await this.refreshCount();
@@ -128,12 +132,21 @@ export class OfflineVisitQueueService {
     console.info('[Sincronização offline] Fichas pendentes:', items.length);
     let sent = 0;
     let failed = 0;
+    let activeEdition: { id: number } | null = null;
+    if (items.some(item => item.editionId)) {
+      try { activeEdition = await firstValueFrom(this.http.get<{ id: number }>(`${environment.apiBaseUrl}/editions/active`)); } catch { /* the individual request reports the connection error */ }
+    }
 
     for (const item of items) {
       if (!item.id) {
         continue;
       }
       const payload = normalizeOfflineVisit(item.visit);
+      if (item.editionId && activeEdition && item.editionId !== activeEdition.id) {
+        failed++;
+        await this.updateFailure(db, { ...item, visit: payload, lastError: 'A ficha pertence a outra edição. Sincronize ou peça ao administrador para reabrir a edição antes de continuar.' });
+        continue;
+      }
       const redactedPayload = redactVisitPayload(payload);
       try {
         console.info('[Sincronização offline] URL:', url);

@@ -4,6 +4,7 @@ import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import org.vindesertao.user.AppUser;
+import org.vindesertao.edition.Edition;
 
 @Entity
 @Table(name = "teams")
@@ -11,6 +12,10 @@ public class Team extends PanacheEntityBase {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     public Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "edition_id")
+    public Edition edition;
 
     @NotBlank
     @Column(nullable = false, unique = true, length = 120)

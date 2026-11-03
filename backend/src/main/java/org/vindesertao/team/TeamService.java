@@ -11,6 +11,7 @@ import org.vindesertao.auth.CurrentUser;
 import org.vindesertao.user.AppUser;
 import org.vindesertao.user.UserRepository;
 import org.vindesertao.user.UserTeamMembershipRepository;
+import org.vindesertao.edition.EditionService;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,8 +38,11 @@ public class TeamService {
     @Inject
     EntityManager entityManager;
 
+    @Inject
+    EditionService editions;
+
     public List<Team> list() {
-        return teams.find("order by name").list();
+        return teams.find("edition.id = ?1 order by name", editions.active().id).list();
     }
 
     public TeamDtos.TeamDetailResponse mine() {
@@ -49,6 +53,7 @@ public class TeamService {
     @Transactional
     public Team create(TeamDtos.TeamRequest request) {
         Team team = new Team();
+        team.edition = editions.active();
         apply(request, team);
         teams.persist(team);
         syncLeaderMainTeam(team);

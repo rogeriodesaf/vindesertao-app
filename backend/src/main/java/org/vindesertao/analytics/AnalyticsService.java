@@ -8,6 +8,7 @@ import org.vindesertao.team.Team;
 import org.vindesertao.team.TeamRepository;
 import org.vindesertao.team.TeamType;
 import org.vindesertao.user.AppUser;
+import org.vindesertao.edition.EditionService;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -24,11 +25,16 @@ public class AnalyticsService {
     @Inject
     TeamRepository teams;
 
+    @Inject
+    EditionService editions;
+
     public AnalyticsDtos.DashboardResponse dashboard(OffsetDateTime from, OffsetDateTime to) {
         AppUser user = currentUser.entity();
+        editions.requireOperationalAccess(user, editions.active());
         String scope = scopeClause(user);
         List<String> filters = new ArrayList<>();
         filters.add("lower(coalesce(v.responsibleUser.roles, '')) not like '%admin%'");
+        filters.add("v.edition.id = :editionId");
         if (!scope.isBlank()) {
             filters.add(scope);
         }
@@ -97,7 +103,7 @@ public class AnalyticsService {
 
     private List<Team> teamsForReport(AppUser user) {
         if (currentUser.isAdmin()) {
-            return teams.find("teamType = ?1 and canRegisterVisits = true order by name", TeamType.EVANGELISM).list();
+            return teams.find("edition.id = ?1 and teamType = ?2 and canRegisterVisits = true order by name", editions.active().id, TeamType.EVANGELISM).list();
         }
         if ((currentUser.isLeader() || user.canViewReports || user.canRegisterVisits) && isEvangelismTeam(user.team)) {
             return List.of(user.team);
@@ -112,6 +118,7 @@ public class AnalyticsService {
     private long countForTeam(Long teamId, Boolean wantsVisits, OffsetDateTime from, OffsetDateTime to) {
         List<String> filters = new ArrayList<>();
         filters.add("v.team.id = :teamId");
+        filters.add("v.edition.id = :editionId");
         filters.add("lower(coalesce(v.responsibleUser.roles, '')) not like '%admin%'");
         if (wantsVisits != null) {
             filters.add("v.wantsVisits = :wantsVisits");
@@ -133,10 +140,12 @@ public class AnalyticsService {
         if (to != null) {
             query.setParameter("to", to);
         }
+        query.setParameter("editionId", editions.active().id);
         return query.getSingleResult();
     }
 
     private void bind(jakarta.persistence.Query query, OffsetDateTime from, OffsetDateTime to, AppUser user) {
+        query.setParameter("editionId", editions.active().id);
         if (!currentUser.isAdmin() && (currentUser.isLeader() || user.canViewReports || user.canRegisterVisits)) {
             query.setParameter("teamId", user.team == null ? -1L : user.team.id);
         }

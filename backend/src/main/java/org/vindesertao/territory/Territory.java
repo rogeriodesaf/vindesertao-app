@@ -4,6 +4,7 @@ import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import org.vindesertao.team.Team;
+import org.vindesertao.edition.Edition;
 
 import java.time.OffsetDateTime;
 
@@ -13,6 +14,10 @@ public class Territory extends PanacheEntityBase {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     public Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "edition_id")
+    public Edition edition;
 
     @NotBlank
     @Column(nullable = false, length = 140)
