@@ -38,6 +38,17 @@ public class AuthResource {
     }
 
     @POST
+    @Path("/register")
+    @PermitAll
+    @Transactional
+    public Response register(@Valid RegisterRequest request) {
+        authService.register(request);
+        return Response.status(Response.Status.CREATED)
+                .entity(Map.of("message", "Cadastro recebido. Aguarde a aprovacao do administrador."))
+                .build();
+    }
+
+    @POST
     @Path("/change-password")
     @RolesAllowed({"admin", "lider", "projetista"})
     @Transactional

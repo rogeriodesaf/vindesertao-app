@@ -16,9 +16,11 @@ import { EvangelisticSupportComponent } from './evangelistic-support/evangelisti
 import { PasswordRecoveryComponent } from './auth/password-recovery.component';
 import { MissionaryTrainingComponent } from './missionary-training/missionary-training.component';
 import { EditionsComponent } from './editions/editions.component';
+import { RegisterComponent } from './auth/register.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
+  { path: 'register', component: RegisterComponent },
   { path: 'forgot-password', component: PasswordRecoveryComponent },
   { path: 'reset-password', component: PasswordRecoveryComponent },
   { path: 'change-password', component: ChangePasswordComponent, canActivate: [authGuard] },

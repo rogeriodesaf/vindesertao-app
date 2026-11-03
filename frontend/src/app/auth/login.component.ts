@@ -76,6 +76,7 @@ const REMEMBERED_EMAIL_KEY = 'vinde.rememberedEmail';
 
         <button type="submit" class="login-submit" [disabled]="loading()">{{ loading() ? 'Entrando...' : 'Entrar' }}</button>
         <a class="login-forgot-link" routerLink="/forgot-password">Esqueci minha senha</a>
+        <a class="login-register-link" routerLink="/register">Criar conta</a>
       </form>
     </section>
   `

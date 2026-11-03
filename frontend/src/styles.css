@@ -2105,6 +2105,8 @@ tbody tr:hover { background: var(--color-hover); }
 }
 
 .editions-page { max-width: 1120px; margin: 0 auto; }
+.login-register-link { display: block; margin-top: 12px; color: var(--color-primary-readable); text-align: center; font-weight: 750; text-decoration: none; }
+.login-help { margin: -4px 0 4px; font-size: 13px; line-height: 1.4; }
 .edition-form { margin-bottom: 16px; }
 .edition-form h2 { margin-top: 0; }
 .edition-row { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--line); }

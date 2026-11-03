@@ -9,6 +9,9 @@ import org.vindesertao.user.AppUser;
 import org.vindesertao.user.UserRepository;
 import org.vindesertao.user.UserTeamMembershipRepository;
 import org.vindesertao.team.TeamRepository;
+import jakarta.ws.rs.ConflictException;
+import jakarta.transaction.Transactional;
+import org.vindesertao.audit.AuditService;
 
 import java.time.Duration;
 import java.time.OffsetDateTime;
@@ -27,6 +30,9 @@ public class AuthService {
     @Inject
     TeamRepository teams;
 
+    @Inject
+    AuditService auditService;
+
     @ConfigProperty(name = "mp.jwt.verify.issuer")
     String issuer;
 
@@ -38,6 +44,27 @@ public class AuthService {
                 .filter(user -> user.active)
                 .filter(user -> BCrypt.checkpw(request.password(), user.passwordHash))
                 .map(this::toResponse);
+    }
+
+    @Transactional
+    public void register(RegisterRequest request) {
+        String email = request.email().trim().toLowerCase();
+        if (users.findByEmail(email).isPresent()) {
+            throw new ConflictException("Este e-mail ja possui cadastro.");
+        }
+        AppUser user = new AppUser();
+        user.name = request.name().trim();
+        user.email = email;
+        user.passwordHash = hashPassword(request.password());
+        user.roles = "projetista";
+        user.active = false;
+        user.mustChangePassword = false;
+        user.canRegisterVisits = false;
+        user.canViewReports = false;
+        user.canAccessFinance = false;
+        user.canAccessChildren = false;
+        users.persist(user);
+        auditService.log("CREATE", "USER_REGISTRATION", user.id, null, "{\"email\":\"" + email.replace("\"", "") + "\"}");
     }
 
     public String hashPassword(String rawPassword) {

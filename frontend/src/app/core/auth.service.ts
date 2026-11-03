@@ -20,6 +20,10 @@ export class AuthService {
     );
   }
 
+  register(name: string, email: string, password: string) {
+    return this.http.post<{ message: string }>(`${environment.apiBaseUrl}/auth/register`, { name: name.trim(), email: email.trim(), password });
+  }
+
   changePassword(currentPassword: string, newPassword: string) {
     return this.http.post<LoginResponse>(`${environment.apiBaseUrl}/auth/change-password`, { currentPassword, newPassword }).pipe(
       tap((response) => this.setSession(response))
