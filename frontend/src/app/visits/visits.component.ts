@@ -723,12 +723,24 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
           this.notifications.info(this.message());
           return;
         }
+        const latitude = Number(first.lat);
+        const longitude = Number(first.lon);
+        const supportedCity = missionCityMaps.find(city => L.latLngBounds(city.bounds).contains([latitude, longitude]));
+        if (!supportedCity) {
+          if (this.canModifyVisit()) {
+            this.form.manualAddress = first.display_name;
+          }
+          const supportedAreas = missionCityMaps.map(city => city.name).join(' e ');
+          this.message.set(`Endereço encontrado fora da área do mapa. Áreas disponíveis: ${supportedAreas}.`);
+          this.notifications.warning(this.message());
+          return;
+        }
         if (this.canModifyVisit()) {
           this.form.manualAddress = first.display_name;
-          this.selectPoint(Number(first.lat), Number(first.lon));
+          this.selectPoint(latitude, longitude);
           this.locationSource.set('address');
         }
-        this.map?.setView([Number(first.lat), Number(first.lon)], 17);
+        this.map?.setView([latitude, longitude], 17);
       },
       error: () => this.fail('A busca de endereço falhou. Você pode preencher o endereço ou marcar o ponto manualmente.')
     });
