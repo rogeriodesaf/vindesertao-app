@@ -9,8 +9,9 @@ import org.vindesertao.user.AppUser;
 import org.vindesertao.user.UserRepository;
 import org.vindesertao.user.UserTeamMembershipRepository;
 import org.vindesertao.team.TeamRepository;
-import jakarta.ws.rs.ConflictException;
 import jakarta.transaction.Transactional;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
 import org.vindesertao.audit.AuditService;
 
 import java.time.Duration;
@@ -50,7 +51,10 @@ public class AuthService {
     public void register(RegisterRequest request) {
         String email = request.email().trim().toLowerCase();
         if (users.findByEmail(email).isPresent()) {
-            throw new ConflictException("Este e-mail ja possui cadastro.");
+            throw new WebApplicationException(
+                    "Este e-mail ja possui cadastro.",
+                    Response.status(Response.Status.CONFLICT).build()
+            );
         }
         AppUser user = new AppUser();
         user.name = request.name().trim();
