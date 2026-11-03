@@ -410,6 +410,7 @@ h2 { font-size: 17px; }
   background: var(--color-surface-elevated);
   box-shadow: var(--shadow-elevated);
 }
+:root[data-theme="dark"] .login-page .login-panel { background: var(--color-surface); }
 .login-page .login-logo {
   gap: 0;
   margin-bottom: 2px;
