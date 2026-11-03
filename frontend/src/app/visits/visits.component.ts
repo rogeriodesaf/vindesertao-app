@@ -488,6 +488,14 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
       offlineCityLayer['addTo'](map);
     } catch {
       if (this.map !== map || this.mapGeneration !== generation) return;
+      if (city.onlineTileUrl && this.online()) {
+        L.tileLayer(city.onlineTileUrl, {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          maxZoom: city.maxZoom,
+          crossOrigin: true
+        }).addTo(map);
+        return;
+      }
       if (!this.mapTileWarningShown) {
         this.mapTileWarningShown = true;
         this.notifications.info(`O mapa offline de ${city.name} não pôde carregar completamente.`);
@@ -590,7 +598,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
         canRegisterVisits: true
       }])).values()];
       const metadata = await this.offlineMapCache.prepareOfflinePackage(
-        missionCityMaps.map(city => ({ id: city.id, url: city.mapArchiveUrl, version: city.mapDataVersion })),
+        missionCityMaps.filter(city => city.offlineAvailable !== false).map(city => ({ id: city.id, url: city.mapArchiveUrl, version: city.mapDataVersion })),
         territories, page.items, teams, []
       );
       this.offlinePackageMetadata.set(metadata);

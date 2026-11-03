@@ -756,7 +756,7 @@ export class TerritoriesComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private mapArchives() {
-    return missionCityMaps.map(city => ({ id: city.id, url: city.mapArchiveUrl, version: city.mapDataVersion }));
+    return missionCityMaps.filter(city => city.offlineAvailable !== false).map(city => ({ id: city.id, url: city.mapArchiveUrl, version: city.mapDataVersion }));
   }
 
   private estimateOfflineSize(): void {
@@ -786,6 +786,14 @@ export class TerritoriesComponent implements OnInit, AfterViewInit, OnDestroy {
       if (this.map === map) layer['addTo'](map);
     } catch {
       if (!this.map) return;
+      if (city.onlineTileUrl && navigator.onLine) {
+        L.tileLayer(city.onlineTileUrl, {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          maxZoom: city.maxZoom,
+          crossOrigin: true
+        }).addTo(this.map);
+        return;
+      }
       this.notifications.warning(`O mapa offline de ${city.name} nao pode ser carregado neste aparelho.`);
     }
   }

@@ -12,6 +12,8 @@ export interface MissionCityMapProfile {
   mapArchiveUrl: string;
   mapDataVersion: string;
   searchTerms: string[];
+  offlineAvailable?: boolean;
+  onlineTileUrl?: string;
 }
 
 export const missionCityMap: MissionCityMapProfile = {
@@ -42,5 +44,20 @@ export const missionCityMaps: MissionCityMapProfile[] = [
     mapArchiveUrl: '/assets/maps/joao-pessoa-pb.pmtiles',
     mapDataVersion: '2026-07-27',
     searchTerms: ['joao pessoa', 'joao pessoa pb', 'jampa']
+  },
+  {
+    id: 'patos-pb',
+    name: 'Patos - PB',
+    center: [-7.0244, -37.2801],
+    bounds: [[-7.13, -37.40], [-6.91, -37.16]],
+    initialZoom: 13,
+    minZoom: 10,
+    maxZoom: 18,
+    maxDataZoom: 15,
+    mapArchiveUrl: '/assets/maps/patos-pb.pmtiles',
+    mapDataVersion: 'online-2026-11',
+    searchTerms: ['patos', 'patos pb', 'patos paraiba'],
+    offlineAvailable: false,
+    onlineTileUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
   }
 ];
