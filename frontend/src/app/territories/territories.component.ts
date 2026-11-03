@@ -766,6 +766,16 @@ export class TerritoriesComponent implements OnInit, AfterViewInit, OnDestroy {
   private async addOfflineCityLayer(city: MissionCityMapProfile): Promise<void> {
     const map = this.map;
     if (!map) return;
+    if (city.offlineAvailable === false) {
+      if (city.onlineTileUrl && navigator.onLine) {
+        L.tileLayer(city.onlineTileUrl, {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          maxZoom: city.maxZoom,
+          crossOrigin: true
+        }).addTo(map);
+      }
+      return;
+    }
     try {
       const response = await this.offlineMapCache.mapArchive(city.mapArchiveUrl);
       if (!response.ok || this.map !== map) throw new Error(`HTTP ${response.status}`);

@@ -463,6 +463,16 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async addOfflineCityLayer(city: MissionCityMapProfile, map: L.Map, generation: number): Promise<void> {
+    if (city.offlineAvailable === false) {
+      if (city.onlineTileUrl && this.online()) {
+        L.tileLayer(city.onlineTileUrl, {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          maxZoom: city.maxZoom,
+          crossOrigin: true
+        }).addTo(map);
+      }
+      return;
+    }
     try {
       const response = await this.offlineMapCache.mapArchive(city.mapArchiveUrl);
       if (!response.ok) {
