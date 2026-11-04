@@ -8,6 +8,8 @@ import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.vindesertao.audit.AuditLog;
+import org.vindesertao.edition.Edition;
+import org.vindesertao.edition.EditionStatus;
 import org.vindesertao.team.Team;
 import org.vindesertao.user.AppUser;
 import org.vindesertao.visit.HouseholdVisit;
@@ -19,6 +21,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @QuarkusTest
@@ -232,7 +235,7 @@ class VisitResourceTest {
 
     @Test
     @TestSecurity(user = "lider@vindesertao.local", roles = "lider")
-    void userStillListsOwnVisitWhenItBelongsToAnotherTeam() {
+    void leaderCannotListVisitFromAnotherTeam() {
         Long[] ids = QuarkusTransaction.requiringNew().call(() -> {
             AppUser leader = AppUser.<AppUser>find("email", "lider@vindesertao.local").firstResult();
             entityManager.createNativeQuery("""
@@ -250,6 +253,7 @@ class VisitResourceTest {
             visit.wantsVisits = true;
             visit.responsibleUser = leader;
             visit.team = otherTeam;
+            visit.edition = Edition.<Edition>find("status", EditionStatus.ACTIVE).firstResult();
             visit.createdAt = OffsetDateTime.now();
             visit.createdBy = leader.email;
             visit.persist();
@@ -262,7 +266,7 @@ class VisitResourceTest {
                     .get("/visits?page=0&size=100")
                     .then()
                     .statusCode(200)
-                    .body("items.id", hasItem(ids[0].intValue()));
+                    .body("items.id", not(hasItem(ids[0].intValue())));
         } finally {
             QuarkusTransaction.requiringNew().run(() -> {
                 HouseholdVisit.deleteById(ids[0]);

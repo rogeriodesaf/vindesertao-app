@@ -117,10 +117,14 @@ public class VisitService {
         if (visit.edition == null || !visit.edition.id.equals(editions.active().id)) {
             throw new ForbiddenException("Esta ficha pertence a outra edicao.");
         }
-        if (!edit) {
-            return visit;
+        if (currentUser.isLeader()) {
+            Team leaderTeam = editions.teamFor(user, editions.active());
+            if (leaderTeam != null && visit.team != null && leaderTeam.id.equals(visit.team.id)) {
+                return visit;
+            }
+            throw new ForbiddenException(edit ? "Sem permissao para editar esta visita." : "Sem permissao para ver esta visita.");
         }
-        if (currentUser.isLeader() && user.team != null && visit.team != null && user.team.id.equals(visit.team.id)) {
+        if (!edit) {
             return visit;
         }
         if (visit.responsibleUser != null && visit.responsibleUser.id.equals(user.id)) {
@@ -153,6 +157,11 @@ public class VisitService {
         if (teamId != null) {
             where.add("team.id = :teamIdFilter");
             params.and("teamIdFilter", teamId);
+        }
+        if (currentUser.isLeader()) {
+            Team leaderTeam = editions.teamFor(currentUser.entity(), editions.active());
+            where.add("team.id = :leaderTeamId");
+            params.and("leaderTeamId", leaderTeam == null ? -1L : leaderTeam.id);
         }
         if (from != null) {
             where.add("createdAt >= :from");
@@ -222,7 +231,7 @@ public class VisitService {
         if (!user.hasRole("projetista") || visitTeam == null) {
             return;
         }
-        var enforced = territoryService.enforcedForTeam(visitTeam.id);
+        var enforced = territoryService.enforcedForTeam(visitTeam.id, visit.edition == null ? editions.active().id : visit.edition.id);
         if (enforced.isEmpty()) {
             return;
         }

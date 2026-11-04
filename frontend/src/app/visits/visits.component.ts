@@ -337,7 +337,8 @@ interface VisitFormDraft {
 })
 export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   visitTeams = signal<Team[]>([]);
-  activeEditionId = signal<number | null>(null);
+  activeEditionId = signal<number | null>(this.readCachedActiveEditionId());
+  activeEditionLocality = signal('');
   form: Visit = this.blankVisit();
   filters: { neighborhood: string; wantsVisits: string; from: string; to: string } = {
     neighborhood: '',
@@ -422,6 +423,11 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     this.api.activeEdition().subscribe({
       next: edition => {
         this.activeEditionId.set(edition.id);
+        this.activeEditionLocality.set(edition.locality || '');
+        try {
+          localStorage.setItem('vinde.activeEditionId', String(edition.id));
+          localStorage.setItem('vinde.activeEditionLocality', edition.locality || '');
+        } catch { /* armazenamento local indisponível */ }
         if (!this.editingId() && !this.form.editionId) this.form.editionId = edition.id;
       }
     });
@@ -616,7 +622,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadingTerritories.set(true);
     this.api.territories().pipe(finalize(() => this.loadingTerritories.set(false))).subscribe({
       next: (territories) => {
-        this.territories.set(territories);
+        this.territories.set(this.filterTerritoriesForActiveEdition(territories));
         this.renderTerritories();
         this.updateTerritoryStatus();
         this.refreshMapView();
@@ -635,7 +641,8 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
         firstValueFrom(this.api.visits({ page: 0, size: 10000 })),
         firstValueFrom(this.api.territories())
       ]);
-      const teams: Team[] = [...new Map(territories.map(territory => [territory.teamId, {
+      const currentTerritories = this.filterTerritoriesForActiveEdition(territories);
+      const teams: Team[] = [...new Map(currentTerritories.map(territory => [territory.teamId, {
         id: territory.teamId,
         name: territory.teamName || territory.name,
         teamType: 'EVANGELISM' as const,
@@ -643,7 +650,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
       }])).values()];
       const metadata = await this.offlineMapCache.prepareOfflinePackage(
         missionCityMaps.filter(city => city.offlineAvailable !== false).map(city => ({ id: city.id, url: city.mapArchiveUrl, version: city.mapDataVersion })),
-        territories, page.items, teams, []
+        currentTerritories, page.items, teams, []
       );
       this.offlinePackageMetadata.set(metadata);
       this.notifications.success(`Mapa offline pronto com ${page.items.length} casas e ${territories.length} territorios.`);
@@ -719,8 +726,9 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private loadCachedTerritories(requestFailed = false): void {
     this.offlineMapCache.loadTerritories().then((territories) => {
-      if (territories.length) {
-        this.territories.set(territories);
+      const currentTerritories = this.filterTerritoriesForActiveEdition(territories);
+      if (currentTerritories.length) {
+        this.territories.set(currentTerritories);
         this.renderTerritories();
         this.updateTerritoryStatus();
         this.refreshMapView();
@@ -782,7 +790,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
           if (this.canModifyVisit()) {
             this.form.manualAddress = first.display_name;
           }
-          const supportedAreas = missionCityMaps.map(city => city.name).join(' e ');
+          const supportedAreas = this.activeEditionLocality() || missionCityMaps.map(city => city.name).join(' e ');
           this.message.set(`Endereço encontrado fora da área do mapa. Áreas disponíveis: ${supportedAreas}.`);
           this.notifications.warning(this.message());
           return;
@@ -1228,6 +1236,21 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   canManageVisits(): boolean {
     const user = this.auth.user();
     return !!user && (user.roles.includes('admin') || (!user.roles.includes('visualizador') && user.canRegisterVisits));
+  }
+
+  private filterTerritoriesForActiveEdition(territories: Territory[]): Territory[] {
+    const editionId = this.activeEditionId();
+    if (!editionId) return [];
+    return territories.filter(territory => territory.editionId === editionId);
+  }
+
+  private readCachedActiveEditionId(): number | null {
+    try {
+      const value = Number(localStorage.getItem('vinde.activeEditionId'));
+      return Number.isInteger(value) && value > 0 ? value : null;
+    } catch {
+      return null;
+    }
   }
 
   isViewer(): boolean {
@@ -1760,10 +1783,21 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private errorMessage(response: HttpErrorResponse): string {
+    {
+    const detail = String(response.error?.detail || response.error?.message || '');
+    return this.specificSaveErrorMessage(response, detail);
     if (response.status === 401) {
       return 'Sua sessão expirou. Faça login novamente.';
     }
     if (response.status === 403) {
+      if (/edicao ativa|edição ativa|autorizado nesta/i.test(detail)) {
+        return 'Sua conta não está autorizada na edição ativa. Peça ao administrador para autorizar seu usuário e vincular sua equipe nesta edição.';
+      }
+      if (/territ[oó]rio|localiza|coordenada|ponto/i.test(detail)) {
+        return 'O ponto está fora do território autorizado da sua equipe. Escolha um local dentro do limite exibido ou peça ao administrador para configurar o território.';
+      }
+      return 'Sua conta não tem permissão para esta operação ou para os registros de outra equipe.';
+    }
       return 'Você não possui permissão para salvar esta ficha ou atuar neste território.';
     }
     if (response.status === 422) {
@@ -1775,6 +1809,9 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     if (response.status >= 500) {
       return 'O servidor está indisponível no momento. Os campos foram mantidos; tente novamente.';
     }
+    if (response.status === 0) {
+      return 'Não foi possível conectar ao servidor. Verifique a internet; os campos e a foto foram mantidos para tentar novamente.';
+    }
     const body = response.error;
     if (body?.detail) {
       return body.detail;
@@ -1785,6 +1822,28 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     if (body?.violations?.length) {
       return body.violations.map((violation: { message: string }) => violation.message).join(' ');
     }
+    return 'Não foi possível salvar. Revise os campos e tente novamente.';
+  }
+
+  private specificSaveErrorMessage(response: HttpErrorResponse, detail: string): string {
+    if (response.status === 401) return 'Sua sessão expirou. Faça login novamente.';
+    if (response.status === 403) {
+      if (/edicao ativa|edição ativa|autorizado nesta/i.test(detail)) {
+        return 'Sua conta não está autorizada na edição ativa. Peça ao administrador para autorizar seu usuário e vincular sua equipe nesta edição.';
+      }
+      if (/territ[oó]rio|localiza|coordenada|ponto/i.test(detail)) {
+        return 'O ponto está fora do território autorizado da sua equipe. Escolha um local dentro do limite exibido ou peça ao administrador para configurar o território.';
+      }
+      return 'Sua conta não tem permissão para esta operação ou para os registros de outra equipe.';
+    }
+    if (response.status === 422) return 'Alguns dados da ficha não foram aceitos. Revise os campos e tente novamente.';
+    if (response.status === 408 || response.status === 504) return 'O servidor demorou para responder. Os campos foram mantidos; tente novamente.';
+    if (response.status >= 500) return 'O servidor está indisponível no momento. Os campos foram mantidos; tente novamente.';
+    if (response.status === 0) return 'Não foi possível conectar ao servidor. Verifique a internet; os campos e a foto foram mantidos para tentar novamente.';
+    const body = response.error;
+    if (body?.detail) return body.detail;
+    if (body?.errors) return Object.values(body.errors).join(' ');
+    if (body?.violations?.length) return body.violations.map((violation: { message: string }) => violation.message).join(' ');
     return 'Não foi possível salvar. Revise os campos e tente novamente.';
   }
 
@@ -1907,6 +1966,11 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.hasSelectedPoint()) {
       this.territoryStatus.set('');
       this.territoryOutside.set(false);
+      return;
+    }
+    if (!this.territories().length) {
+      this.territoryOutside.set(true);
+      this.territoryStatus.set('Nenhum território foi publicado para esta edição. Peça ao administrador para configurar o território antes de salvar.');
       return;
     }
     const territory = this.territories().find((item) => this.pointInsideTerritory(item));

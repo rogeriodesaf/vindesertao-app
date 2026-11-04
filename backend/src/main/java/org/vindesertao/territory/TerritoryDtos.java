@@ -20,6 +20,7 @@ public class TerritoryDtos {
 
     public record TerritoryResponse(
             Long id,
+            Long editionId,
             String name,
             Long teamId,
             String teamName,
@@ -37,6 +38,7 @@ public class TerritoryDtos {
         public static TerritoryResponse from(Territory territory, long houseCount, long locatedHouseCount) {
             return new TerritoryResponse(
                     territory.id,
+                    territory.edition == null ? null : territory.edition.id,
                     territory.name,
                     territory.team.id,
                     territory.team.name,

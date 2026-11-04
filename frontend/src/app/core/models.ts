@@ -146,6 +146,7 @@ export interface TeamDetail {
 
 export interface Territory {
   id?: number;
+  editionId?: number;
   name: string;
   teamId: number;
   teamName?: string;

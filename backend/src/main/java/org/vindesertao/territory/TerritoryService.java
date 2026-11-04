@@ -9,6 +9,7 @@ import jakarta.ws.rs.NotFoundException;
 import org.vindesertao.audit.AuditService;
 import org.vindesertao.auth.CurrentUser;
 import org.vindesertao.edition.EditionService;
+import org.vindesertao.edition.Edition;
 import org.vindesertao.team.Team;
 import org.vindesertao.team.TeamRepository;
 import org.vindesertao.user.AppUser;
@@ -50,14 +51,15 @@ public class TerritoryService {
     VisitRepository visits;
 
     public List<Territory> listVisible() {
-        if (currentUser.isAdmin() || currentUser.isLeader()) {
-            return list();
+        Edition edition = editions.active();
+        if (currentUser.isAdmin()) {
+            return list(edition.id);
         }
-        Set<Long> teamIds = visibleVisitTeamIds(currentUser.entity());
+        Set<Long> teamIds = visibleVisitTeamIds(currentUser.entity(), edition);
         if (teamIds.isEmpty()) {
             return List.of();
         }
-        return territories.find("active = true and edition.id = ?1 and team.id in ?2 order by name", editions.active().id, teamIds).list();
+        return territories.find("active = true and edition.id = ?1 and team.id in ?2 order by name", edition.id, teamIds).list();
     }
 
     public List<TerritoryDtos.TerritoryResponse> listVisibleResponses() {
@@ -75,12 +77,16 @@ public class TerritoryService {
         }).toList();
     }
 
-    private List<Territory> list() {
-        return territories.find("edition.id = ?1 order by name", editions.active().id).list();
+    private List<Territory> list(Long editionId) {
+        return territories.find("edition.id = ?1 order by name", editionId).list();
     }
 
     public List<Territory> enforcedForTeam(Long teamId) {
-        return territories.find("team.id = ?1 and active = true and enforceForProjectists = true", teamId).list();
+        return enforcedForTeam(teamId, editions.active().id);
+    }
+
+    public List<Territory> enforcedForTeam(Long teamId, Long editionId) {
+        return territories.find("team.id = ?1 and edition.id = ?2 and active = true and enforceForProjectists = true", teamId, editionId).list();
     }
 
     @Transactional
@@ -168,12 +174,13 @@ public class TerritoryService {
         }
     }
 
-    private Set<Long> visibleVisitTeamIds(AppUser user) {
+    private Set<Long> visibleVisitTeamIds(AppUser user, Edition edition) {
         Set<Long> ids = new LinkedHashSet<>();
-        if (user.team != null && user.team.canRegisterVisits) {
+        if (user.team != null && user.team.edition != null && user.team.edition.id.equals(edition.id)
+                && user.team.canRegisterVisits) {
             ids.add(user.team.id);
         }
-        memberships.find("user.id = ?1 and team.canRegisterVisits = true order by team.name", user.id)
+        memberships.find("user.id = ?1 and team.edition.id = ?2 and team.canRegisterVisits = true order by team.name", user.id, edition.id)
                 .list()
                 .forEach(membership -> ids.add(membership.team.id));
         return ids;
