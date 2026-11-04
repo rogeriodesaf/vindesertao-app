@@ -90,6 +90,30 @@ class VisitResourceTest {
 
     @Test
     @TestSecurity(user = "admin@vindesertao.local", roles = "admin")
+    void adminCreatesVisitForSelectedEvangelismTeam() {
+        String reference = UUID.randomUUID().toString();
+        String body = """
+                {
+                  "personName": "Visita administrativa",
+                  "city": "Rio Tinto",
+                  "wantsVisits": true,
+                  "clientReference": "%s",
+                  "teamId": 1
+                }
+                """.formatted(reference);
+
+        try {
+            given().contentType(ContentType.JSON).body(body)
+                    .when().post("/visits")
+                    .then().statusCode(200)
+                    .body("teamId", equalTo(1));
+        } finally {
+            QuarkusTransaction.requiringNew().run(() -> HouseholdVisit.delete("clientReference", reference));
+        }
+    }
+
+    @Test
+    @TestSecurity(user = "admin@vindesertao.local", roles = "admin")
     void adminUpdatesAndDeletesVisitSheets() {
         Long visitId = QuarkusTransaction.requiringNew().call(() -> {
             AppUser leader = AppUser.<AppUser>find("email", "lider@vindesertao.local").firstResult();

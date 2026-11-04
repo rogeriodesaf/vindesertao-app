@@ -134,6 +134,17 @@ interface VisitFormDraft {
 
         @if (canModifyVisit()) {
           <h2 class="visit-form-title">{{ editingId() ? 'Editar visita' : 'Nova visita' }}</h2>
+          @if (isAdmin() && !editingId()) {
+            <label class="visit-team-selector" for="visit-team">Equipe da visita
+              <select id="visit-team" name="teamId" [(ngModel)]="form.teamId" required>
+                <option [ngValue]="undefined">Selecione uma equipe de evangelismo</option>
+                @for (team of visitTeams(); track team.id) {
+                  <option [ngValue]="team.id">{{ team.name }}</option>
+                }
+              </select>
+              <small class="field-help">A ficha será vinculada à edição ativa e aparecerá nos indicadores da equipe escolhida.</small>
+            </label>
+          }
           <form #visitForm="ngForm" class="visit-accordion-form" novalidate (ngSubmit)="save(visitForm)">
             <app-form-section title="Informações básicas" subtitle="Dados principais da visita" icon="person" tone="cyan" sectionId="visit-basic"
               [open]="openSection() === 'basic'" [error]="sectionError() === 'basic'" (toggle)="toggleSection('basic')">
@@ -325,6 +336,8 @@ interface VisitFormDraft {
   `
 })
 export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
+  visitTeams = signal<Team[]>([]);
+  activeEditionId = signal<number | null>(null);
   form: Visit = this.blankVisit();
   filters: { neighborhood: string; wantsVisits: string; from: string; to: string } = {
     neighborhood: '',
@@ -405,6 +418,17 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     if (this.mobileViewport()) {
       this.restorePersistedVisitDraft();
+    }
+    this.api.activeEdition().subscribe({
+      next: edition => {
+        this.activeEditionId.set(edition.id);
+        if (!this.editingId() && !this.form.editionId) this.form.editionId = edition.id;
+      }
+    });
+    if (this.isAdmin()) {
+      this.api.teams().subscribe({
+        next: teams => this.visitTeams.set(teams.filter(team => team.teamType === 'EVANGELISM' && team.canRegisterVisits))
+      });
     }
   }
 
@@ -785,6 +809,10 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
       const section: VisitFormSection = invalidName === 'personName' ? 'basic' : 'more';
       this.openInvalidField(section, invalidName);
       this.fail('Preencha os campos obrigatórios antes de salvar.');
+      return;
+    }
+    if (this.isAdmin() && !this.editingId() && !this.form.teamId) {
+      this.fail('Selecione a equipe da visita antes de salvar.');
       return;
     }
     const payload = normalizeOfflineVisit(this.form);
@@ -1199,7 +1227,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
 
   canManageVisits(): boolean {
     const user = this.auth.user();
-    return !!user && !user.roles.includes('admin') && !user.roles.includes('visualizador') && user.canRegisterVisits;
+    return !!user && (user.roles.includes('admin') || (!user.roles.includes('visualizador') && user.canRegisterVisits));
   }
 
   isViewer(): boolean {
@@ -1621,7 +1649,7 @@ export class VisitsComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private blankVisit(): Visit {
-    return { personName: '', city: 'Rio Tinto', wantsVisits: true };
+    return { personName: '', city: 'Rio Tinto', wantsVisits: true, editionId: this.activeEditionId() ?? undefined };
   }
 
   private preserveVisitDraft(): void {

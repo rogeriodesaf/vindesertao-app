@@ -33,7 +33,6 @@ public class AnalyticsService {
         editions.requireOperationalAccess(user, editions.active());
         String scope = scopeClause(user);
         List<String> filters = new ArrayList<>();
-        filters.add("lower(coalesce(v.responsibleUser.roles, '')) not like '%admin%'");
         filters.add("v.edition.id = :editionId");
         if (!scope.isBlank()) {
             filters.add(scope);
@@ -119,7 +118,6 @@ public class AnalyticsService {
         List<String> filters = new ArrayList<>();
         filters.add("v.team.id = :teamId");
         filters.add("v.edition.id = :editionId");
-        filters.add("lower(coalesce(v.responsibleUser.roles, '')) not like '%admin%'");
         if (wantsVisits != null) {
             filters.add("v.wantsVisits = :wantsVisits");
         }

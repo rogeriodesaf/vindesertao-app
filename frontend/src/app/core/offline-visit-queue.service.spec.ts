@@ -51,6 +51,15 @@ describe('offline visit payload', () => {
     expect(typeof payload.wantsVisits).toBe('boolean');
   });
 
+  it('preserves the selected team and edition for offline synchronization', () => {
+    const payload = normalizeOfflineVisit({
+      personName: 'Pessoa', city: 'Rio Tinto', wantsVisits: true, editionId: 2, teamId: 41
+    });
+
+    expect(payload.editionId).toBe(2);
+    expect(payload.teamId).toBe(41);
+  });
+
   it('redacts personal, location and photo data from diagnostics', () => {
     const diagnostic = redactVisitPayload(normalizeOfflineVisit({
       personName: 'Pessoa',

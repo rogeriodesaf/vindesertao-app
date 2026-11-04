@@ -10,6 +10,8 @@ import jakarta.ws.rs.NotFoundException;
 import org.vindesertao.audit.AuditService;
 import org.vindesertao.auth.CurrentUser;
 import org.vindesertao.team.Team;
+import org.vindesertao.team.TeamRepository;
+import org.vindesertao.team.TeamType;
 import org.vindesertao.territory.TerritoryService;
 import org.vindesertao.user.AppUser;
 import org.vindesertao.user.UserTeamMembershipRepository;
@@ -41,6 +43,9 @@ public class VisitService {
     UserTeamMembershipRepository memberships;
 
     @Inject
+    TeamRepository teams;
+
+    @Inject
     PhotoStorageService photoStorage;
 
     @Inject
@@ -62,7 +67,7 @@ public class VisitService {
                 return existing;
             }
         }
-        Team visitTeam = resolveVisitTeam(user);
+        Team visitTeam = resolveVisitTeam(user, request.teamId(), edition);
         HouseholdVisit visit = new HouseholdVisit();
         apply(request, visit);
         visit.responsibleUser = user;
@@ -130,8 +135,6 @@ public class VisitService {
         List<String> where = new ArrayList<>();
         Parameters params = new Parameters();
 
-        where.add("lower(coalesce(responsibleUser.roles, '')) not like :adminRole");
-        params.and("adminRole", "%admin%");
         where.add("edition.id = :editionId");
         params.and("editionId", editions.active().id);
 
@@ -232,24 +235,41 @@ public class VisitService {
         }
     }
 
-    private Team resolveVisitTeam(AppUser user) {
+    private Team resolveVisitTeam(AppUser user, Long requestedTeamId, Edition edition) {
         if (currentUser.isAdmin()) {
-            throw new IllegalArgumentException("O administrador acompanha as visitas pelo mapa e relatorios, mas nao registra fichas de visita.");
+            if (requestedTeamId == null) {
+                throw new IllegalArgumentException("Selecione uma equipe de evangelismo para esta visita.");
+            }
+            Team team = teams.findByIdOptional(requestedTeamId)
+                    .orElseThrow(() -> new IllegalArgumentException("Equipe nao encontrada."));
+            if (team.edition == null || !team.edition.id.equals(edition.id)
+                    || team.teamType != TeamType.EVANGELISM || !team.canRegisterVisits) {
+                throw new IllegalArgumentException("Selecione uma equipe de evangelismo da edicao ativa.");
+            }
+            return team;
         }
         if (!user.canRegisterVisits) {
             throw new IllegalArgumentException("Este usuario ou equipe nao esta autorizado a registrar visitas.");
         }
-        Team editionTeam = editions.teamFor(user, editions.active());
+        Team editionTeam = editions.teamFor(user, edition);
         if (editionTeam != null && editionTeam.canRegisterVisits) {
-            return editionTeam;
+            return requireAssignedTeam(editionTeam, requestedTeamId);
         }
-        if (user.team != null && user.team.canRegisterVisits && user.team.edition != null && user.team.edition.id.equals(editions.active().id)) {
-            return user.team;
+        if (user.team != null && user.team.canRegisterVisits && user.team.edition != null && user.team.edition.id.equals(edition.id)) {
+            return requireAssignedTeam(user.team, requestedTeamId);
         }
-        return memberships.find("user.id = ?1 and team.canRegisterVisits = true order by team.name", user.id)
+        Team team = memberships.find("user.id = ?1 and team.canRegisterVisits = true and team.edition.id = ?2 order by team.name", user.id, edition.id)
                 .firstResultOptional()
                 .map(membership -> membership.team)
                 .orElseThrow(() -> new IllegalArgumentException("Este usuario precisa estar vinculado a uma equipe de evangelismo para registrar visitas."));
+        return requireAssignedTeam(team, requestedTeamId);
+    }
+
+    private Team requireAssignedTeam(Team assignedTeam, Long requestedTeamId) {
+        if (requestedTeamId != null && !requestedTeamId.equals(assignedTeam.id)) {
+            throw new ForbiddenException("A equipe selecionada nao pertence ao seu acesso operacional.");
+        }
+        return assignedTeam;
     }
 
     private String snapshot(HouseholdVisit visit) {

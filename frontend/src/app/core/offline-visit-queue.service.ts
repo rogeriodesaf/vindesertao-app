@@ -26,6 +26,7 @@ export function normalizeOfflineVisit(source: Visit): Visit {
   const photoData = optionalString(value.photoData);
   return {
     editionId: optionalNumber(value.editionId),
+    teamId: optionalNumber(value.teamId),
     personName: requiredString(value.personName),
     phone: optionalString(value.phone),
     street: optionalString(value.street),

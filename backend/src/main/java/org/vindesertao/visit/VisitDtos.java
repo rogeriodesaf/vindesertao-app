@@ -28,7 +28,8 @@ public class VisitDtos {
             String photoContentType,
             String photoFileName,
             String streetViewUrl,
-            String clientReference
+            String clientReference,
+            Long teamId
     ) {
     }
 
